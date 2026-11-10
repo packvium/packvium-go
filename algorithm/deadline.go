@@ -3,8 +3,8 @@ package algorithm
 import (
 	"time"
 
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // MinimumSliceNS is the least a multi-start is ever given, or a long start list would hand

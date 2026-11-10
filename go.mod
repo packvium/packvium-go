@@ -1,3 +1,3 @@
-module github.com/toxakara/packvium-go
+module github.com/packvium/packvium-go
 
 go 1.13

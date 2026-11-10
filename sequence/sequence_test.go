@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // Expected values come from the v1.0.0 reference engine.

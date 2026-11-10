@@ -3,11 +3,11 @@
 package nested
 
 import (
-	"github.com/toxakara/packvium-go/algorithm"
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/packer"
-	"github.com/toxakara/packvium-go/result"
+	"github.com/packvium/packvium-go/algorithm"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/packer"
+	"github.com/packvium/packvium-go/result"
 )
 
 // Level is one tier of the nesting: its name, the containers offered at it, and the

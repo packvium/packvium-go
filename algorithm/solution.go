@@ -1,9 +1,9 @@
 package algorithm
 
 import (
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/result"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/result"
 )
 
 // Candidate is one feasible placement: envelope corner, physical position, orientation and

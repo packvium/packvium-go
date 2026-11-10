@@ -3,9 +3,9 @@ package algorithm
 import (
 	"math/big"
 
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // ExactSmallSolver is a depth-first branch and bound over whole group batches. It is exact

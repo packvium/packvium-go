@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/units"
 )
 
 func instance(t *testing.T, id string, length, width, height int64, sequence int) domain.ItemInstance {

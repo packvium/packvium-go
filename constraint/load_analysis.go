@@ -5,10 +5,10 @@ import (
 	"math/bits"
 	"sort"
 
-	"github.com/toxakara/packvium-go/compression"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/compression"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/units"
 )
 
 // SquareMetreTicks is one square metre in length ticks squared, the reference area a stack

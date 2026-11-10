@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/toxakara/packvium-go/internal/ints"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/units"
 )
 
 // PackedContainer is one opened container and what went into it. When the compact lattice

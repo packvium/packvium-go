@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/hull"
-	"github.com/toxakara/packvium-go/internal/ints"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/hull"
+	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/units"
 )
 
 // ContainerState is placed boxes plus the candidate points they expose; mutable, owned by one

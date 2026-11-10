@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/units"
 )
 
 // SolverProfile chooses how hard the portfolio searches.

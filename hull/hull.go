@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/toxakara/packvium-go/internal/wide"
+	"github.com/packvium/packvium-go/internal/wide"
 )
 
 // Vertex is a point in an item's local tick frame. Unlike a placement point it may be

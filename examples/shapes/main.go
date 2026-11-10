@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/toxakara/packvium-go/serialization"
+	"github.com/packvium/packvium-go/serialization"
 )
 
 type object = map[string]interface{}

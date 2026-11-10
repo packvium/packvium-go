@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // Lower bounds on the objective vector. The mathematics is fixed by

@@ -14,7 +14,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/toxakara/packvium-go/commerce"
+	"github.com/packvium/packvium-go/commerce"
 )
 
 const (

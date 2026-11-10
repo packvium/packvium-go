@@ -1,6 +1,6 @@
 package domain
 
-import "github.com/toxakara/packvium-go/internal/pyrepr"
+import "github.com/packvium/packvium-go/internal/pyrepr"
 
 // InvalidDirectionCode is the stable discriminator an invalid direction carries on the wire.
 const InvalidDirectionCode = "invalid_direction"

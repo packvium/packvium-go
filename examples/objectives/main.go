@@ -20,12 +20,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/toxakara/packvium-go/algorithm"
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/packer"
-	"github.com/toxakara/packvium-go/result"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/algorithm"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/packer"
+	"github.com/packvium/packvium-go/result"
+	"github.com/packvium/packvium-go/units"
 )
 
 var widgets = []*domain.Item{item("widget", "500 g", 8, nil)}

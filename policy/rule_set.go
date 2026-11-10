@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/toxakara/packvium-go/constraint"
+	"github.com/packvium/packvium-go/constraint"
 )
 
 var policyKeys = []string{"as_of", "shipment", "rules"}

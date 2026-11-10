@@ -4,7 +4,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // LatticeSummary is the compact, O(1)-to-build description of one regular-lattice run. Expand

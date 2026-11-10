@@ -3,7 +3,7 @@ package domain
 import (
 	"math/big"
 
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 var (

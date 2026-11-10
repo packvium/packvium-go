@@ -18,11 +18,11 @@ import (
 	"log"
 	"math/big"
 
-	"github.com/toxakara/packvium-go/algorithm"
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/packer"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/algorithm"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/packer"
+	"github.com/packvium/packvium-go/units"
 )
 
 func length(text string) units.Length {

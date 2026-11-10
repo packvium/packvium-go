@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/toxakara/packvium-go/compression"
-	"github.com/toxakara/packvium-go/hull"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/compression"
+	"github.com/packvium/packvium-go/hull"
+	"github.com/packvium/packvium-go/units"
 )
 
 // MaxExactStopIndex is the largest stop_index every engine can carry identically: past

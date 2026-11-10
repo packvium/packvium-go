@@ -21,8 +21,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/toxakara/packvium-go/internal/jsonvalue"
-	"github.com/toxakara/packvium-go/serialization"
+	"github.com/packvium/packvium-go/internal/jsonvalue"
+	"github.com/packvium/packvium-go/serialization"
 )
 
 type object = map[string]interface{}

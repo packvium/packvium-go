@@ -4,8 +4,8 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // Two-axle weight distribution.

@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/sequence"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/sequence"
+	"github.com/packvium/packvium-go/units"
 )
 
 // testdata/reference-scenes.json holds random scenes run through the v1.0.0 reference

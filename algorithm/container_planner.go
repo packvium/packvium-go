@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // containerPlanner spreads one start's items across containers: greedily, one container per

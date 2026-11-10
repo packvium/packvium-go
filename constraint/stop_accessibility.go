@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // noStop is the stop of an item with no stop index: it rides the whole route and is never

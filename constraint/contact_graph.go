@@ -3,8 +3,8 @@ package constraint
 import (
 	"sort"
 
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // ContactEdge is one direct support: the index of the box below and the contact area in

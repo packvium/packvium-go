@@ -1,8 +1,8 @@
 package domain
 
 import (
-	"github.com/toxakara/packvium-go/hull"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/hull"
+	"github.com/packvium/packvium-go/units"
 )
 
 // Placement is one item instance at a position and rotation, with the clearance envelope it

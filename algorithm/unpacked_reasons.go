@@ -1,9 +1,9 @@
 package algorithm
 
 import (
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // unpackedReasons says why an item ended up unpacked, proven where pure geometry can prove

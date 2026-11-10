@@ -1,6 +1,6 @@
 package domain
 
-import "github.com/toxakara/packvium-go/units"
+import "github.com/packvium/packvium-go/units"
 
 // The copy helpers below give every optional field its own storage, so neither the caller's
 // spec nor a value handed out by an accessor can change an item or container afterwards.

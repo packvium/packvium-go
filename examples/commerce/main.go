@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/toxakara/packvium-go/commerce"
+	"github.com/packvium/packvium-go/commerce"
 )
 
 type object = map[string]interface{}

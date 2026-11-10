@@ -1,7 +1,7 @@
 name: release
 
 # A Go module is published by its tag: proxy.golang.org fetches the module from this
-# repository the first time anyone asks for `github.com/toxakara/packvium-go@vX.Y.Z`, so there
+# repository the first time anyone asks for `github.com/packvium/packvium-go@vX.Y.Z`, so there
 # is no upload step and no credential. What a tag still needs is a GitHub Release a human can
 # read, built from the changelog.
 #

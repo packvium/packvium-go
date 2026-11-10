@@ -1,8 +1,8 @@
 package sequence
 
 import (
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // DependencyGraph is, per placement index, the indices it depends on. Unloading and loading

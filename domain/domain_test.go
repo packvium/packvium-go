@@ -4,8 +4,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/toxakara/packvium-go/hull"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/hull"
+	"github.com/packvium/packvium-go/units"
 )
 
 // Expected messages were produced by the reference engine's models at v1.0.0, case by case.

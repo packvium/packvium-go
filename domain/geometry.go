@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/toxakara/packvium-go/internal/ints"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/units"
 )
 
 // Rotation names which item axis lies along each container axis.

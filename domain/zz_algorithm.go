@@ -4,8 +4,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/toxakara/packvium-go/internal/ints"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/units"
 )
 
 // DimensionalWeight is volume * weight-unit ticks / (length-unit ticks^3 * divisor), floored:

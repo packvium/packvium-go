@@ -3,7 +3,7 @@ package algorithm
 import (
 	"strings"
 
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // Refusal carries an error out of the search as a panic value, where the reference throws:

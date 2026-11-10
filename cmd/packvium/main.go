@@ -13,8 +13,8 @@ import (
 	"os"
 	"unicode/utf8"
 
-	"github.com/toxakara/packvium-go/internal/jsonvalue"
-	"github.com/toxakara/packvium-go/serialization"
+	"github.com/packvium/packvium-go/internal/jsonvalue"
+	"github.com/packvium/packvium-go/serialization"
 )
 
 const (

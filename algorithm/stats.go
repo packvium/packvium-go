@@ -1,6 +1,6 @@
 package algorithm
 
-import "github.com/toxakara/packvium-go/result"
+import "github.com/packvium/packvium-go/result"
 
 // SearchStats are per-start mutable work counters; they live only for one solve.
 type SearchStats struct {

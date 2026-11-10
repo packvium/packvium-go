@@ -3,7 +3,7 @@ package constraint
 import (
 	"math/big"
 
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // ReservedVolume is the volume set aside for packing material, exact even for a metre-scale

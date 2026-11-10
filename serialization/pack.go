@@ -3,11 +3,11 @@ package serialization
 import (
 	"fmt"
 
-	"github.com/toxakara/packvium-go/algorithm"
-	"github.com/toxakara/packvium-go/packer"
-	"github.com/toxakara/packvium-go/policy"
-	"github.com/toxakara/packvium-go/result"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/algorithm"
+	"github.com/packvium/packvium-go/packer"
+	"github.com/packvium/packvium-go/policy"
+	"github.com/packvium/packvium-go/result"
+	"github.com/packvium/packvium-go/units"
 )
 
 // Pack is what every engine's command line does: a decoded wire request in, a wire result out.

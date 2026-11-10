@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/units"
 )
 
 // testdata/reference-cases.json was produced by the reference engine's compression module at

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // lowestRemovable is the lowest index among candidates with nothing remaining resting on it

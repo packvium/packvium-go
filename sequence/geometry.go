@@ -1,6 +1,6 @@
 package sequence
 
-import "github.com/toxakara/packvium-go/domain"
+import "github.com/packvium/packvium-go/domain"
 
 // presentSet is which placements are in the container at one step of a replay. Membership
 // alone matters: every reading of it is a boolean or a set that is sorted before it is

@@ -8,7 +8,7 @@ package explain
 import (
 	"strings"
 
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // ReasonCodes are the reason codes with a registered message, in registration order.

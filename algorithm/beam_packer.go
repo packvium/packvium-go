@@ -4,10 +4,10 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // beamNode is a partial packing and the items it has given up on.

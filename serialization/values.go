@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/toxakara/packvium-go/internal/jsonvalue"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/internal/jsonvalue"
+	"github.com/packvium/packvium-go/units"
 )
 
 // The reference reads request values with its own built-in conversions (str, int, float,

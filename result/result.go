@@ -4,7 +4,7 @@ package result
 import (
 	"errors"
 
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // PackingStatus is the overall verdict of a result.

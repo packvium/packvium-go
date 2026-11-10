@@ -1,6 +1,6 @@
 package constraint
 
-import "github.com/toxakara/packvium-go/domain"
+import "github.com/packvium/packvium-go/domain"
 
 // TopLoadConstraint refuses a placement that would rest on something unable to carry it.
 //

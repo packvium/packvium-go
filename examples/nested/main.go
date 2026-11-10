@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/nested"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/nested"
+	"github.com/packvium/packvium-go/units"
 )
 
 func main() {

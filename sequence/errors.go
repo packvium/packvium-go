@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // InvalidDirectionError is a direction outside the six-value vocabulary.

@@ -1,6 +1,6 @@
 package algorithm
 
-import "github.com/toxakara/packvium-go/domain"
+import "github.com/packvium/packvium-go/domain"
 
 // Batches groups items for atomic offering: items in a group share a container, so a batch
 // that does not fit is rejected whole and leaves the rest of the order untouched. Each group

@@ -3,8 +3,8 @@ package hull
 import (
 	"fmt"
 
-	"github.com/toxakara/packvium-go/internal/ints"
-	"github.com/toxakara/packvium-go/internal/wide"
+	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/internal/wide"
 )
 
 // Shape is a convex hull's separating axes in its own local frame, computed once per item

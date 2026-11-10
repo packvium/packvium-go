@@ -3,8 +3,8 @@ package constraint
 import (
 	"sort"
 
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // nestingEntry is the sort key of one nesting-capable unit: declared item type, depth, exact

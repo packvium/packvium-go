@@ -5,10 +5,10 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/hull"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/hull"
 )
 
 // unlimited is the candidate count of a finder call that keeps every feasible placement.

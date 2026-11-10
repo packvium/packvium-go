@@ -1,10 +1,10 @@
 package algorithm
 
 import (
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // MaxMaximalSpaces caps the surviving spaces, the smallest dropped first. Adversarial mixes

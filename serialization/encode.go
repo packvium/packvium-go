@@ -3,10 +3,10 @@ package serialization
 import (
 	"strconv"
 
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/result"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/result"
+	"github.com/packvium/packvium-go/units"
 )
 
 // EncodeResult is the wire form of a packing result in the given output units. Key order is

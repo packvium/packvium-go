@@ -3,9 +3,9 @@ package algorithm
 import (
 	"math/big"
 
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // CandidateScorer ranks feasible placements; lower sorts first. It takes the origin and

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // PlacementReachability is per-box reachability for the full scene as it stands, one entry

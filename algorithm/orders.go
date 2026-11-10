@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/domain"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/domain"
 )
 
 // ItemOrderStrategy is a caller-supplied item ordering the portfolio also tries.

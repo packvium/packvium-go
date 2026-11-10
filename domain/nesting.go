@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/toxakara/packvium-go/compression"
+	"github.com/packvium/packvium-go/compression"
 )
 
 // IsValidNesting reports whether a and b are exactly the nested-column relationship

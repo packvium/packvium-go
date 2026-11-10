@@ -1,6 +1,6 @@
 package constraint
 
-import "github.com/toxakara/packvium-go/domain"
+import "github.com/packvium/packvium-go/domain"
 
 // LoadUnit is the only facts load propagation needs about a box, real or hypothetical.
 //

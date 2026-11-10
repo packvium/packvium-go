@@ -15,7 +15,7 @@ matches the reference result byte for byte.
 ## Install
 
 ```bash
-go get github.com/toxakara/packvium-go@v1.0.0
+go get github.com/packvium/packvium-go@v1.0.1
 ```
 
 Go 1.13 or newer. The module is checked on a real Go 1.13 toolchain, so projects that
@@ -30,10 +30,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/toxakara/packvium-go/algorithm"
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/packer"
+	"github.com/packvium/packvium-go/algorithm"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/packer"
 )
 
 func main() {

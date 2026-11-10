@@ -1,6 +1,6 @@
 package algorithm
 
-import "github.com/toxakara/packvium-go/internal/ints"
+import "github.com/packvium/packvium-go/internal/ints"
 
 const cellsPerAxis int64 = 8
 

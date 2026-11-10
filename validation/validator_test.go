@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/units"
 )
 
 // Expected issue lists were produced by the v1.0.0 reference engine.

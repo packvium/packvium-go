@@ -7,11 +7,11 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/toxakara/packvium-go/compression"
-	"github.com/toxakara/packvium-go/config"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/hull"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/compression"
+	"github.com/packvium/packvium-go/config"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/hull"
+	"github.com/packvium/packvium-go/units"
 )
 
 const weightUnit = "g"

@@ -4,7 +4,7 @@
 // nothing here imports a solver.
 package constraint
 
-import "github.com/toxakara/packvium-go/domain"
+import "github.com/packvium/packvium-go/domain"
 
 // Context is one candidate placement and the state it is judged against.
 //

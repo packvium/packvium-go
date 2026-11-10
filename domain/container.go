@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/toxakara/packvium-go/internal/ints"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/units"
 )
 
 // Obstacle is an excluded zone: a union of exact boxes, so a non-rectangular shape such as

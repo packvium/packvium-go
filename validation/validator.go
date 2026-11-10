@@ -13,11 +13,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
-	"github.com/toxakara/packvium-go/sequence"
-	"github.com/toxakara/packvium-go/units"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/sequence"
+	"github.com/packvium/packvium-go/units"
 )
 
 // ValidationIssue is one broken guarantee: a stable code and the detail naming what broke.

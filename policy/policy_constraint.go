@@ -3,9 +3,9 @@ package policy
 import (
 	"fmt"
 
-	"github.com/toxakara/packvium-go/constraint"
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/pyrepr"
+	"github.com/packvium/packvium-go/constraint"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/pyrepr"
 )
 
 // PolicyConstraint refuses a candidate placement that any participating rule forbids.

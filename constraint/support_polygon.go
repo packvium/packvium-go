@@ -3,9 +3,9 @@ package constraint
 import (
 	"sort"
 
-	"github.com/toxakara/packvium-go/domain"
-	"github.com/toxakara/packvium-go/internal/ints"
-	"github.com/toxakara/packvium-go/internal/wide"
+	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/internal/wide"
 )
 
 // Convex hull and tipping geometry.

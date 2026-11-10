@@ -1,6 +1,6 @@
 package hull
 
-import "github.com/toxakara/packvium-go/internal/wide"
+import "github.com/packvium/packvium-go/internal/wide"
 
 // orderedFace gift-wraps the corners of one planar convex face into cyclic order seen from
 // outside. Vertices lying inside the face or along an edge are skipped: collinear
