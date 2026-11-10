@@ -1,0 +1,9 @@
+without the rule, the highest vase sits at 1100 mm
+with a 400mm limit, vases sit at ['0', '200'] and 0 were left behind
+
+        default: [['anvil', 'anvil'], ['pillow', 'pillow']]  ->  ['20 kg', '2 kg']
+  evenly loaded: [['anvil', 'pillow'], ['anvil', 'pillow']]  ->  ['11 kg', '11 kg']
+
+Neither rule above exists on the wire. Hand the same request to the Rust or
+JavaScript engine and you get the unrestricted answer -- which is exactly why a
+rule everyone must obey belongs in the request as data, not in a class.

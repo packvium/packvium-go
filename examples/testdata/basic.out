@@ -1,0 +1,8 @@
+status     feasible
+containers ['box-m']
+packed     6 of 6
+unpacked   []
+score      (0, 1, 180, 795002, 560000)  <- lexicographic, exact integers, lower is better
+
+the full result as a plain dict is what serialization.py explores:
+['algorithm', 'alternatives', 'catalog_versions_used', 'complete', 'containers', 'feasibility', 'objective', 'optimality', 'score', 'status', 'summary', 'termination', 'unpacked_items', 'warnings']

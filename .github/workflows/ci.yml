@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege by default; jobs that need more request it explicitly.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+        # 1.13 is the declared minimum (the `go` directive in go.mod); "stable" is what a new
+        # consumer installs today.
+        go: ["1.13", "stable"]
+        exclude:
+          # Go 1.13 has no darwin/arm64 build, and macos-latest runners are Apple Silicon.
+          - os: macos-latest
+            go: "1.13"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go vet ./...
+      # Runs the unit tests and every example in examples/; the corpus tests skip outside
+      # the Packvium suite repository and say why.
+      - run: go test ./...
+      - name: CLI smoke test
+        shell: bash
+        run: |
+          go build -o packvium-cli ./cmd/packvium
+          echo '{"items":[{"id":"box","quantity":8,"dimensions":{"length":"50","width":"50","height":"50"}}],
+                 "containers":[{"id":"carton","inner_dimensions":{"length":"100","width":"100","height":"100"}}]}' \
+            | ./packvium-cli > result.json
+          grep -q '"complete": true' result.json
+
+  # A formatting drift is cheap to fix and expensive to review; fail on it explicitly.
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+      - run: test -z "$(gofmt -l .)"
+
+  # Fails a pull request that introduces a dependency with a known vulnerability or a
+  # licence the project has not accepted. With no dependencies outside the standard library
+  # its usual answer is "nothing changed", which is the answer we want to keep true.
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+          comment-summary-in-pr: on-failure

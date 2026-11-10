@@ -1,0 +1,7 @@
+convex_hull -- two complementary wedges cut from one cube
+  as cuboids             feasible   2 container(s), 2 placed, 0 refused
+  as hulls               feasible   1 container(s), 2 placed, 0 refused
+
+compressible -- a cushion that yields to the load above it
+  brick 101 kg           1 container(s), unused volume 123808 ppm
+  brick 102 kg           2 container(s), unused volume 1000000 ppm

@@ -1,0 +1,47 @@
+status      feasible
+score       [0, 1337, 1, 743600, 560000]   <- lexicographic, exact integers, cheapest first
+solver      extreme_points:seeded_2 in <masked> ms
+containers  ['box-m']
+placed      8
+unplaced    []
+
+one placement, in full:
+{
+  "item_id": "mug#2",
+  "item_type": "mug",
+  "position": {
+    "x": {
+      "ticks": 0,
+      "value": "0",
+      "unit": "mm"
+    },
+    "y": {
+      "ticks": 0,
+      "value": "0",
+      "unit": "mm"
+    },
+    "z": {
+      "ticks": 0,
+      "value": "0",
+      "unit": "mm"
+    }
+  },
+  "dimensions": {
+    "length": {
+      "ticks": 1600000,
+      "value": "100",
+      "unit": "mm"
+    },
+    ...
+
+alternatives: 2
+   score [0, 1337, 1, 743600, 560000] first two placements [('mug#2', '0'), ('book#4', '100')]
+   score [0, 1337, 1, 743600, 560000] first two placements [('book#1', '0'), ('mug#1', '140')]
+
+misspelled field: feasible -- accepted; the misspelling is invisible to the parser,
+                  so `keep_upright` was never applied to the mug
+unknown objective: unknown objective 'cheapest'; expected one of ['default', 'lowest_cost', 'lowest_landed_cost', 'maxi
+fields this engine refuses by name: none
+  what one looks like, from an engine that is not: unsupported_feature: the Python engine does not yet implement item.shape_type=convex_hull; the request was rej
+
+the CLI takes exactly the document above:  echo '...' | python3 -m packvium

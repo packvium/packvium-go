@@ -1,0 +1,27 @@
+          30  ->        480000 ticks  =  30 mm
+     30.5 mm  ->        488000 ticks  =  30.5 mm
+     3/16 in  ->         76200 ticks  =  4.7625 mm
+   12 3/8 in  ->       5029200 ticks  =  314.325 mm
+        2 ft  ->       9753600 ticks  =  609.6 mm
+       1.5 m  ->      24000000 ticks  =  1500 mm
+
+       450 g  ->      3600000000 ticks  =  450 g
+       12 oz  ->      2721554220 ticks  =  340.1942775 g
+      1.5 kg  ->     12000000000 ticks  =  1500 g
+    2 3/4 lb  ->      9979032140 ticks  =  1247.3790175 g
+
+1 inch is 406400 ticks, so 1/128 in is 3175 ticks exactly
+1/16 in as a fraction of a mm: 127/80 == 127/80
+128 x (1/128 in) == 1 in ? True
+  3 x (1/3 in) == 1 in ? False -- 1/3 in is 406400/3 ticks, which is not an integer
+
+0.1 + 0.2 == 0.3 in floats: False
+the same three tenths as lengths: True
+
+exactly 100mm fits:       True
+one tick over does not:   False
+
+400mm cube = 64,000 cm^3 / 5,000 = 12.8 kg dimensional weight
+
+on the wire: {'ticks': 5029200, 'value': '314.325', 'unit': 'mm'} {'ticks': 9979032140, 'value': '1247.3790175', 'unit': 'g'}
+packed 3 shelves, 0 left over

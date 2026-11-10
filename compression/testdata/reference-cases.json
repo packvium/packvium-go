@@ -1,0 +1,1438 @@
+{
+"cases": [
+{
+"load": 0,
+"area": 25600000000,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 25600000000,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 25600000000,
+"num": "0",
+"den": "1",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"height": 7
+},
+{
+"load": 0,
+"area": 25600000000,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 25600000000,
+"num": "0",
+"den": "1",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 0,
+"area": 1,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 1,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 1,
+"num": "0",
+"den": "1",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"height": 7
+},
+{
+"load": 0,
+"area": 1,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 1,
+"num": "0",
+"den": "1",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 0,
+"area": 2560000000000,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 2560000000000,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 2560000000000,
+"num": "0",
+"den": "1",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"height": 7
+},
+{
+"load": 0,
+"area": 2560000000000,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 2560000000000,
+"num": "0",
+"den": "1",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 0,
+"area": 12345,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 12345,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 12345,
+"num": "0",
+"den": "1",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"height": 7
+},
+{
+"load": 0,
+"area": 12345,
+"num": "0",
+"den": "1",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 0,
+"area": 12345,
+"num": "0",
+"den": "1",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 1,
+"area": 25600000000,
+"num": "196133",
+"den": "16000000000000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 1,
+"area": 25600000000,
+"num": "196133",
+"den": "16000000000000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 1,
+"area": 25600000000,
+"num": "196133",
+"den": "16000000000000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 196133/16000000000000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 1,
+"area": 25600000000,
+"num": "196133",
+"den": "16000000000000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 1,
+"area": 25600000000,
+"num": "196133",
+"den": "16000000000000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 1,
+"area": 1,
+"num": "196133",
+"den": "625",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 196133/625 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 1,
+"area": 1,
+"num": "196133",
+"den": "625",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 196133/625 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 1,
+"area": 1,
+"num": "196133",
+"den": "625",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 196133/625 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 1,
+"area": 1,
+"num": "196133",
+"den": "625",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 196133/625 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 1,
+"area": 1,
+"num": "196133",
+"den": "625",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 1,
+"area": 2560000000000,
+"num": "196133",
+"den": "1600000000000000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 1,
+"area": 2560000000000,
+"num": "196133",
+"den": "1600000000000000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1600000
+},
+{
+"load": 1,
+"area": 2560000000000,
+"num": "196133",
+"den": "1600000000000000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 196133/1600000000000000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 1,
+"area": 2560000000000,
+"num": "196133",
+"den": "1600000000000000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 1,
+"area": 2560000000000,
+"num": "196133",
+"den": "1600000000000000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 1,
+"area": 12345,
+"num": "196133",
+"den": "7715625",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1599899
+},
+{
+"load": 1,
+"area": 12345,
+"num": "196133",
+"den": "7715625",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1599594
+},
+{
+"load": 1,
+"area": 12345,
+"num": "196133",
+"den": "7715625",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 196133/7715625 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 1,
+"area": 12345,
+"num": "196133",
+"den": "7715625",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 1,
+"area": 12345,
+"num": "196133",
+"den": "7715625",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 8000000,
+"area": 25600000000,
+"num": "196133",
+"den": "2000000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1599608
+},
+{
+"load": 8000000,
+"area": 25600000000,
+"num": "196133",
+"den": "2000000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1598431
+},
+{
+"load": 8000000,
+"area": 25600000000,
+"num": "196133",
+"den": "2000000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 196133/2000000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 8000000,
+"area": 25600000000,
+"num": "196133",
+"den": "2000000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 8000000,
+"area": 25600000000,
+"num": "196133",
+"den": "2000000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 8000000,
+"area": 1,
+"num": "2510502400",
+"den": "1",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 2510502400/1 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 8000000,
+"area": 1,
+"num": "2510502400",
+"den": "1",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 2510502400/1 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 8000000,
+"area": 1,
+"num": "2510502400",
+"den": "1",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 2510502400/1 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 8000000,
+"area": 1,
+"num": "2510502400",
+"den": "1",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 2510502400/1 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 8000000,
+"area": 1,
+"num": "2510502400",
+"den": "1",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"error": "applied pressure 2510502400/1 kPa exceeds the declared limit of 1000000 kPa"
+},
+{
+"load": 8000000,
+"area": 2560000000000,
+"num": "196133",
+"den": "200000000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1599997
+},
+{
+"load": 8000000,
+"area": 2560000000000,
+"num": "196133",
+"den": "200000000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1599985
+},
+{
+"load": 8000000,
+"area": 2560000000000,
+"num": "196133",
+"den": "200000000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 196133/200000000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 8000000,
+"area": 2560000000000,
+"num": "196133",
+"den": "200000000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 8000000,
+"area": 2560000000000,
+"num": "196133",
+"den": "200000000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 8000000,
+"area": 12345,
+"num": "502100480",
+"den": "2469",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 502100480/2469 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 8000000,
+"area": 12345,
+"num": "502100480",
+"den": "2469",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 502100480/2469 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 8000000,
+"area": 12345,
+"num": "502100480",
+"den": "2469",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 502100480/2469 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 8000000,
+"area": 12345,
+"num": "502100480",
+"den": "2469",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 502100480/2469 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 8000000,
+"area": 12345,
+"num": "502100480",
+"den": "2469",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 8000000000,
+"area": 25600000000,
+"num": "196133",
+"den": "2000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1207734
+},
+{
+"load": 8000000000,
+"area": 25600000000,
+"num": "196133",
+"den": "2000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 30936
+},
+{
+"load": 8000000000,
+"area": 25600000000,
+"num": "196133",
+"den": "2000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 196133/2000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 8000000000,
+"area": 25600000000,
+"num": "196133",
+"den": "2000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 196133/2000 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 8000000000,
+"area": 25600000000,
+"num": "196133",
+"den": "2000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 8000000000,
+"area": 1,
+"num": "2510502400000",
+"den": "1",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 2510502400000/1 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 8000000000,
+"area": 1,
+"num": "2510502400000",
+"den": "1",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 2510502400000/1 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 8000000000,
+"area": 1,
+"num": "2510502400000",
+"den": "1",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 2510502400000/1 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 8000000000,
+"area": 1,
+"num": "2510502400000",
+"den": "1",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 2510502400000/1 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 8000000000,
+"area": 1,
+"num": "2510502400000",
+"den": "1",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"error": "applied pressure 2510502400000/1 kPa exceeds the declared limit of 1000000 kPa"
+},
+{
+"load": 8000000000,
+"area": 2560000000000,
+"num": "196133",
+"den": "200000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1596078
+},
+{
+"load": 8000000000,
+"area": 2560000000000,
+"num": "196133",
+"den": "200000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1584310
+},
+{
+"load": 8000000000,
+"area": 2560000000000,
+"num": "196133",
+"den": "200000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 196133/200000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 8000000000,
+"area": 2560000000000,
+"num": "196133",
+"den": "200000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 8000000000,
+"area": 2560000000000,
+"num": "196133",
+"den": "200000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 8000000000,
+"area": 12345,
+"num": "502100480000",
+"den": "2469",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 502100480000/2469 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 8000000000,
+"area": 12345,
+"num": "502100480000",
+"den": "2469",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 502100480000/2469 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 8000000000,
+"area": 12345,
+"num": "502100480000",
+"den": "2469",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 502100480000/2469 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 8000000000,
+"area": 12345,
+"num": "502100480000",
+"den": "2469",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 502100480000/2469 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 8000000000,
+"area": 12345,
+"num": "502100480000",
+"den": "2469",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"error": "applied pressure 502100480000/2469 kPa exceeds the declared limit of 1000000 kPa"
+},
+{
+"load": 808000000000,
+"area": 25600000000,
+"num": "19809433",
+"den": "2000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 19809433/2000 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 808000000000,
+"area": 25600000000,
+"num": "19809433",
+"den": "2000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 19809433/2000 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 808000000000,
+"area": 25600000000,
+"num": "19809433",
+"den": "2000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 19809433/2000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 808000000000,
+"area": 25600000000,
+"num": "19809433",
+"den": "2000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 19809433/2000 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 808000000000,
+"area": 25600000000,
+"num": "19809433",
+"den": "2000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 808000000000,
+"area": 1,
+"num": "253560742400000",
+"den": "1",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 253560742400000/1 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 808000000000,
+"area": 1,
+"num": "253560742400000",
+"den": "1",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 253560742400000/1 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 808000000000,
+"area": 1,
+"num": "253560742400000",
+"den": "1",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 253560742400000/1 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 808000000000,
+"area": 1,
+"num": "253560742400000",
+"den": "1",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 253560742400000/1 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 808000000000,
+"area": 1,
+"num": "253560742400000",
+"den": "1",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"error": "applied pressure 253560742400000/1 kPa exceeds the declared limit of 1000000 kPa"
+},
+{
+"load": 808000000000,
+"area": 2560000000000,
+"num": "19809433",
+"den": "200000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1203812
+},
+{
+"load": 808000000000,
+"area": 2560000000000,
+"num": "19809433",
+"den": "200000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 15246
+},
+{
+"load": 808000000000,
+"area": 2560000000000,
+"num": "19809433",
+"den": "200000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 19809433/200000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 808000000000,
+"area": 2560000000000,
+"num": "19809433",
+"den": "200000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 19809433/200000 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 808000000000,
+"area": 2560000000000,
+"num": "19809433",
+"den": "200000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 808000000000,
+"area": 12345,
+"num": "50712148480000",
+"den": "2469",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 50712148480000/2469 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 808000000000,
+"area": 12345,
+"num": "50712148480000",
+"den": "2469",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 50712148480000/2469 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 808000000000,
+"area": 12345,
+"num": "50712148480000",
+"den": "2469",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 50712148480000/2469 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 808000000000,
+"area": 12345,
+"num": "50712148480000",
+"den": "2469",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 50712148480000/2469 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 808000000000,
+"area": 12345,
+"num": "50712148480000",
+"den": "2469",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"error": "applied pressure 50712148480000/2469 kPa exceeds the declared limit of 1000000 kPa"
+},
+{
+"load": 816000000000,
+"area": 25600000000,
+"num": "10002783",
+"den": "1000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 10002783/1000 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 816000000000,
+"area": 25600000000,
+"num": "10002783",
+"den": "1000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 10002783/1000 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 816000000000,
+"area": 25600000000,
+"num": "10002783",
+"den": "1000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 10002783/1000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 816000000000,
+"area": 25600000000,
+"num": "10002783",
+"den": "1000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 10002783/1000 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 816000000000,
+"area": 25600000000,
+"num": "10002783",
+"den": "1000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 816000000000,
+"area": 1,
+"num": "256071244800000",
+"den": "1",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 256071244800000/1 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 816000000000,
+"area": 1,
+"num": "256071244800000",
+"den": "1",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 256071244800000/1 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 816000000000,
+"area": 1,
+"num": "256071244800000",
+"den": "1",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 256071244800000/1 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 816000000000,
+"area": 1,
+"num": "256071244800000",
+"den": "1",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 256071244800000/1 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 816000000000,
+"area": 1,
+"num": "256071244800000",
+"den": "1",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"error": "applied pressure 256071244800000/1 kPa exceeds the declared limit of 1000000 kPa"
+},
+{
+"load": 816000000000,
+"area": 2560000000000,
+"num": "10002783",
+"den": "100000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 10002783/100000 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 816000000000,
+"area": 2560000000000,
+"num": "10002783",
+"den": "100000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 10002783/100000 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 816000000000,
+"area": 2560000000000,
+"num": "10002783",
+"den": "100000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 10002783/100000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 816000000000,
+"area": 2560000000000,
+"num": "10002783",
+"den": "100000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 10002783/100000 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 816000000000,
+"area": 2560000000000,
+"num": "10002783",
+"den": "100000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 816000000000,
+"area": 12345,
+"num": "17071416320000",
+"den": "823",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 17071416320000/823 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 816000000000,
+"area": 12345,
+"num": "17071416320000",
+"den": "823",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 17071416320000/823 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 816000000000,
+"area": 12345,
+"num": "17071416320000",
+"den": "823",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 17071416320000/823 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 816000000000,
+"area": 12345,
+"num": "17071416320000",
+"den": "823",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 17071416320000/823 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 816000000000,
+"area": 12345,
+"num": "17071416320000",
+"den": "823",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"error": "applied pressure 17071416320000/823 kPa exceeds the declared limit of 1000000 kPa"
+},
+{
+"load": 123456789,
+"area": 25600000000,
+"num": "24213950396937",
+"den": "16000000000000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1593947
+},
+{
+"load": 123456789,
+"area": 25600000000,
+"num": "24213950396937",
+"den": "16000000000000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1575787
+},
+{
+"load": 123456789,
+"area": 25600000000,
+"num": "24213950396937",
+"den": "16000000000000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 24213950396937/16000000000000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 123456789,
+"area": 25600000000,
+"num": "24213950396937",
+"den": "16000000000000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 123456789,
+"area": 25600000000,
+"num": "24213950396937",
+"den": "16000000000000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 123456789,
+"area": 1,
+"num": "24213950396937",
+"den": "625",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 24213950396937/625 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 123456789,
+"area": 1,
+"num": "24213950396937",
+"den": "625",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 24213950396937/625 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 123456789,
+"area": 1,
+"num": "24213950396937",
+"den": "625",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 24213950396937/625 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 123456789,
+"area": 1,
+"num": "24213950396937",
+"den": "625",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 24213950396937/625 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 123456789,
+"area": 1,
+"num": "24213950396937",
+"den": "625",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"error": "applied pressure 24213950396937/625 kPa exceeds the declared limit of 1000000 kPa"
+},
+{
+"load": 123456789,
+"area": 2560000000000,
+"num": "24213950396937",
+"den": "1600000000000000",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"height": 1599940
+},
+{
+"load": 123456789,
+"area": 2560000000000,
+"num": "24213950396937",
+"den": "1600000000000000",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"height": 1599758
+},
+{
+"load": 123456789,
+"area": 2560000000000,
+"num": "24213950396937",
+"den": "1600000000000000",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 24213950396937/1600000000000000 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 123456789,
+"area": 2560000000000,
+"num": "24213950396937",
+"den": "1600000000000000",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"height": 1600000
+},
+{
+"load": 123456789,
+"area": 2560000000000,
+"num": "24213950396937",
+"den": "1600000000000000",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"height": 3
+},
+{
+"load": 123456789,
+"area": 12345,
+"num": "8071316798979",
+"den": "2571875",
+"height_in": 1600000,
+"ratio": 250000,
+"kpa": 100,
+"error": "applied pressure 8071316798979/2571875 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 123456789,
+"area": 12345,
+"num": "8071316798979",
+"den": "2571875",
+"height_in": 1600000,
+"ratio": 1000000,
+"kpa": 100,
+"error": "applied pressure 8071316798979/2571875 kPa exceeds the declared limit of 100 kPa"
+},
+{
+"load": 123456789,
+"area": 12345,
+"num": "8071316798979",
+"den": "2571875",
+"height_in": 7,
+"ratio": 500000,
+"kpa": 0,
+"error": "applied pressure 8071316798979/2571875 kPa exceeds the declared limit of 0 kPa"
+},
+{
+"load": 123456789,
+"area": 12345,
+"num": "8071316798979",
+"den": "2571875",
+"height_in": 1600000,
+"ratio": 0,
+"kpa": 5,
+"error": "applied pressure 8071316798979/2571875 kPa exceeds the declared limit of 5 kPa"
+},
+{
+"load": 123456789,
+"area": 12345,
+"num": "8071316798979",
+"den": "2571875",
+"height_in": 3,
+"ratio": 999999,
+"kpa": 1000000,
+"error": "applied pressure 8071316798979/2571875 kPa exceeds the declared limit of 1000000 kPa"
+}
+],
+"ratios": [
+{
+"ratio": 0.0,
+"ppm": 0
+},
+{
+"ratio": 0.25,
+"ppm": 250000
+},
+{
+"ratio": 0.1,
+"ppm": 100000
+},
+{
+"ratio": 0.3333333,
+"ppm": 333333
+},
+{
+"ratio": 5e-07,
+"ppm": 1
+},
+{
+"ratio": 1.5e-06,
+"ppm": 2
+},
+{
+"ratio": 1.0,
+"ppm": 1000000
+},
+{
+"ratio": 0.123456789,
+"ppm": 123457
+}
+]
+}

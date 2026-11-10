@@ -1,0 +1,65 @@
+name: release
+
+# A Go module is published by its tag: proxy.golang.org fetches the module from this
+# repository the first time anyone asks for `github.com/toxakara/packvium-go@vX.Y.Z`, so there
+# is no upload step and no credential. What a tag still needs is a GitHub Release a human can
+# read, built from the changelog.
+#
+# A pre-release tag (`v1.0.0-rc.1`) gets no Release; the negated pattern must follow the
+# positive one.
+on:
+  push:
+    tags: ["v*", "!v*-*"]
+
+permissions:
+  contents: read
+
+jobs:
+  # The tag is immutable once the proxy has seen it, so the tree it names must pass before a
+  # Release advertises it.
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.13", "stable"]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go vet ./... && go test ./...
+
+  # Every tag gets a GitHub Release: a tag is a git object, a Release is what a human and a
+  # maintenance scorer can read.
+  github-release:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # the Release is the only thing this workflow writes to the repository
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Create the GitHub Release from the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; nothing to do."
+            exit 0
+          fi
+          # This version's entry, from its heading to the next one. A tag whose version has
+          # no entry would publish a Release nobody can read, so that fails the job.
+          awk -v want="## [$version]" '
+            index($0, want) == 1 { inside = 1; next }
+            inside && /^## \[/   { exit }
+            inside               { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "CHANGELOG.md carries no entry for $version" >&2
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Packvium for Go $version" \
+            --notes-file release-notes.md \
+            --verify-tag

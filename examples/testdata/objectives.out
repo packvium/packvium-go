@@ -1,0 +1,7 @@
+default           ('roomy', (0, 1, 150, 875000, 250000))
+lowest_cost       ('roomy', (0, 150, 1, 875000, 250000))
+shipping_cost     ('snug', (0, 43200000000, 1, 703703, 333333))
+landed_cost       ('roomy', (0, 1500, 1, 875000, 250000))
+landed_cost*      refused: container 'roomy' bills at 12800 g, above its rate table's last bracket (2000 g); the shipment has no published price
+open_dimension    ('roomy', (0, 1600000, 1, 150, 875000))
+maximum_value     packed: ['gold', 'gold'] left behind: ['gravel', 'gravel']

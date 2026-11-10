@@ -1,0 +1,39 @@
+status: best_found
+containers opened: 2
+
+crate #1 (crate): 6 placement(s)
+  paint        at (0, 0, 0) mm
+  paint        at (200, 200, 0) mm
+  cake         at (400, 200, 0) mm
+  glass-panel  at (200, 0, 0) mm
+  bleach       at (0, 200, 0) mm
+  bleach       at (200, 40, 0) mm
+
+crate #2 (crate): 3 placement(s)
+  flour        at (0, 0, 0) mm
+  flour        at (150, 200, 0) mm
+  flour        at (300, 200, 0) mm
+
+not packed:
+  ladder       ladder#1: Proven: does not fit inside any offered container in any rotation
+
+allowed_rotations -- a pole that only fits lying down, forbidden from lying down
+  without the rule: 1 container(s), 1 placed, 0 refused
+  with the rule   : 0 container(s), 0 placed, 1 refused
+      pole#1: Proven: would fit in some container with more rotations allowed, but not with the rotations this item permits
+
+max_stacked_items -- five tins fit in one column; three-high needs two columns
+  without the rule: 1 container(s), 5 placed, 0 refused
+  with the rule   : 2 container(s), 5 placed, 0 refused
+
+minimum_support_ratio -- a slab perched on a quarter of its base
+  without the rule: 1 container(s), 2 placed, 0 refused
+  with the rule   : 2 container(s), 2 placed, 0 refused
+
+group -- one member cannot be placed, so none of them is
+  without the rule: 1 container(s), 2 placed, 1 refused
+      kit-3#1: Proven: does not fit inside any offered container in any rotation
+  with the rule   : 0 container(s), 0 placed, 3 refused
+      kit-3#1: Proven: does not fit inside any offered container in any rotation
+      kit-2#1: Inferred: belongs to a group that could not all be placed together
+      kit-1#1: Inferred: belongs to a group that could not all be placed together

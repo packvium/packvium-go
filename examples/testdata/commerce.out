@@ -1,0 +1,96 @@
+
+== a quote pinned to tariff version 1
+{
+  "api_version": 1,
+  "status": "ok",
+  "quote": {
+    "carrier_id": "acme",
+    "service_id": "ground",
+    "tariff_version": 1,
+    "zone": "zone-a",
+    "actual_weight_g": 1200,
+    "dimensional_weight_g": 1200,
+    "billed_weight_g": 1200,
+    "base_charge_minor": 900,
+    "minimum_charge_applied": true,
+    "fuel_surcharge_minor": 108,
+    "accessorial_charges_minor": [
+      [
+        "liftgate",
+        250
+      ]
+    ],
+    "total_minor": 1258
+  }
+}
+   -> the caller pays 1258 minor units
+
+   as of instant 1500 the tariff is version 2, and the price is 1358
+
+== a zone this tariff does not price
+{
+  "api_version": 1,
+  "status": "rejected",
+  "error": {
+    "code": "unavailable_zone",
+    "fields": {
+      "carrier_id": "acme",
+      "service_id": "ground",
+      "tariff_version": 1,
+      "zone": "zone-nowhere"
+    }
+  }
+}
+
+== a policy decision, with the rule that made it
+{
+  "api_version": 1,
+  "status": "ok",
+  "decision": {
+    "scope": "hazmat",
+    "allowed": false,
+    "citation": {
+      "rule_id": "no-hazmat-air",
+      "version": 1,
+      "action": "reject",
+      "priority": 10,
+      "reason": "class 1.4 is not accepted on air services"
+    }
+  }
+}
+
+   nothing matched, so the shipment is allowed with no citation: None
+
+== catalog version metadata
+{
+  "api_version": 1,
+  "status": "ok",
+  "catalog": {
+    "catalog_id": "dc-12",
+    "version": 2,
+    "effective_at": 900,
+    "published_at": 900,
+    "resolved_at": 1700,
+    "rolled_back_from": 1,
+    "note": "revert the weight correction",
+    "entry_counts": {
+      "items": 1,
+      "cartons": 1,
+      "pallets": 0,
+      "exclusions": 0,
+      "overrides": 0
+    },
+    "item_ids": [
+      "sku-1"
+    ],
+    "carton_ids": [
+      "box-m"
+    ],
+    "pallet_ids": []
+  }
+}
+
+   version 2 is a rollback of version 1
+
+== the canonical form is what you store, log and compare
+{"api_version":1,"quote":{"accessorial_charges_minor":[["liftgate",250]],"actual_weight_g":1200,"base_charge_minor":900,"billed_weight_g":1200,"carrier_id":"acme","dimensional_weight_g":1200,"fuel_surcharge_minor":108,"minimum_charge_applied":true,"service_id":"ground","tariff_version":1,"total_minor":1258,"zone":"zone-a"},"status":"ok"}

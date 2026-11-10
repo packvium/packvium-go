@@ -1,0 +1,12 @@
+== carton ==
+   status: feasible
+   containers used: 2
+     box-l    holding 35 item(s)
+     box-s    holding 5 item(s)
+
+== pallet ==
+   status: feasible
+   containers used: 1
+     euro     holding 2 item(s)
+
+2 carton(s) travelling on 1 pallet(s)
