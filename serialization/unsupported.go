@@ -17,8 +17,10 @@ type UnsupportedFields struct {
 	ShapeTypes    []string
 }
 
-// CurrentlyUnsupported is what this engine still refuses: nothing at 1.0.0.
-var CurrentlyUnsupported = UnsupportedFields{}
+// CurrentlyUnsupported is what this engine still refuses. container.pallet_overhang_limit is
+// reserved by the 1.1.0 contract and refused by every engine until one implements it: a field
+// a caller can set and the solver ignores is worse than a refusal.
+var CurrentlyUnsupported = UnsupportedFields{Container: []string{"pallet_overhang_limit"}}
 
 // Empty reports whether the engine refuses nothing.
 func (u UnsupportedFields) Empty() bool {

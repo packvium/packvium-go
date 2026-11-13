@@ -197,46 +197,70 @@ func axleBalancedPoints(state *ContainerState, item domain.ItemInstance, forms [
 	return points
 }
 
+// activeRule is one constraint the scan evaluates, and whether reaching it counts as a
+// support check.
+type activeRule struct {
+	rule          constraint.PlacementConstraint
+	countsSupport bool
+}
+
 // scan is the per-call state: what has been found so far and the inputs every point shares.
 type scan struct {
-	state                 *ContainerState
-	item                  domain.ItemInstance
-	cfg                   *config.PackingConfig
-	constraints           []constraint.PlacementConstraint
-	stats                 *SearchStats
-	deadline              *Deadline
-	scorer                CandidateScorer
-	max                   int
-	compressionSensitive  bool
-	reserveNeedsCandidate bool
-	stackSensitive        bool
-	routeSensitive        bool
-	placementOffset       int
-	clearance             int64
-	found                 []Candidate
-	best                  *Candidate
+	state                *ContainerState
+	item                 domain.ItemInstance
+	cfg                  *config.PackingConfig
+	active               []activeRule
+	stats                *SearchStats
+	deadline             *Deadline
+	scorer               CandidateScorer
+	max                  int
+	compressionSensitive bool
+	reserveCheck         bool
+	nesting              bool
+	stackSensitive       bool
+	routeSensitive       bool
+	placementOffset      int
+	clearance            int64
+	found                []Candidate
+	best                 *Candidate
 }
 
 func newScan(state *ContainerState, item domain.ItemInstance, cfg *config.PackingConfig,
 	constraints []constraint.PlacementConstraint, stats *SearchStats, deadline *Deadline, scorer CandidateScorer,
 	max int, compressionSensitive, reserveNeedsCandidate bool) *scan {
+	stackSensitive := state.StackSensitive || item.Item().IsStackSensitive() || state.Container.MaxStackDensity() != nil
+	routeSensitive := state.RouteSensitive || item.Item().StopIndex() != nil
 	return &scan{
-		state: state, item: item, cfg: cfg, constraints: constraints, stats: stats, deadline: deadline,
-		scorer: scorer, max: max, compressionSensitive: compressionSensitive,
-		reserveNeedsCandidate: reserveNeedsCandidate,
-		stackSensitive: state.StackSensitive || item.Item().IsStackSensitive() ||
-			state.Container.MaxStackDensity() != nil,
-		routeSensitive:  state.RouteSensitive || item.Item().StopIndex() != nil,
+		state: state, item: item, cfg: cfg,
+		active: activeRules(constraints, state.Container, item, stackSensitive, routeSensitive),
+		stats:  stats, deadline: deadline, scorer: scorer, max: max, compressionSensitive: compressionSensitive,
+		reserveCheck:    state.Container.VoidFillReserveRatio() > 0 && reserveNeedsCandidate,
+		nesting:         item.Item().NestingHeight() != nil,
+		stackSensitive:  stackSensitive,
+		routeSensitive:  routeSensitive,
 		placementOffset: len(state.Bounds) - len(state.Placements),
 		clearance:       cfg.Clearance().Ticks(),
 	}
+}
+
+// activeRules prunes the chain once per call rather than answering "allow" once per position.
+// The support rule is never inert, so SupportChecks still counts every time the chain reaches
+// it.
+func activeRules(constraints []constraint.PlacementConstraint, container *domain.Container, item domain.ItemInstance,
+	stackSensitive, routeSensitive bool) []activeRule {
+	kept := constraint.Active(constraints, container, item, stackSensitive, routeSensitive)
+	rules := make([]activeRule, len(kept))
+	for index, rule := range kept {
+		_, support := rule.(*constraint.SupportConstraint)
+		rules[index] = activeRule{rule, support}
+	}
+	return rules
 }
 
 func (s *scan) visit(point domain.Point, forms []form) {
 	s.deadline.Check()
 	s.stats.CandidatePointsConsidered++
 	inner := s.state.Container.InnerDimensions()
-	nesting := s.item.Item().NestingHeight() != nil
 	for index := range forms {
 		candidateForm := &forms[index]
 		s.stats.PlacementsAttempted++
@@ -246,7 +270,7 @@ func (s *scan) visit(point domain.Point, forms []form) {
 		}
 		position := domain.MustPoint(point.X()+s.clearance, point.Y()+s.clearance, point.Z()+s.clearance)
 		var tentative *domain.Placement
-		if nesting {
+		if s.nesting {
 			placement := s.placementAt(position, point, candidateForm)
 			tentative = &placement
 		}
@@ -255,7 +279,7 @@ func (s *scan) visit(point domain.Point, forms []form) {
 		}
 		candidate := Candidate{point, position, candidateForm.rotation, candidateForm.physical, candidateForm.envelope,
 			s.scorer.Score(s.state, point, candidateForm.envelope)}
-		if s.state.Container.VoidFillReserveRatio() > 0 && s.reserveNeedsCandidate {
+		if s.reserveCheck {
 			reservePlacement := s.placementAt(position, point, candidateForm)
 			if tentative != nil {
 				reservePlacement = *tentative
@@ -310,11 +334,11 @@ func (s *scan) blocked(point domain.Point, x2, y2, z2 int64, candidateForm *form
 func (s *scan) allowed(point domain.Point, candidateForm *form) bool {
 	context := constraint.NewContext(s.state.Container, s.state.Placements, s.item, point, candidateForm.rotation,
 		candidateForm.physical, candidateForm.envelope).WithSensitivity(s.stackSensitive, s.routeSensitive)
-	for _, rule := range s.constraints {
-		if _, support := rule.(*constraint.SupportConstraint); support {
+	for _, active := range s.active {
+		if active.countsSupport {
 			s.stats.SupportChecks++
 		}
-		if !rule.Evaluate(context).Allowed() {
+		if !active.rule.Evaluate(context).Allowed() {
 			return false
 		}
 	}

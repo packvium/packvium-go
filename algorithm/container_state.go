@@ -135,10 +135,11 @@ func (s *ContainerState) Add(placement domain.Placement) {
 }
 
 func (s *ContainerState) retirePointsInside(box domain.Box) {
+	bound := boundOf(box)
 	retired := false
 	kept := s.points[:0:0]
 	for _, point := range s.points {
-		if box.ContainsPoint(point) {
+		if bound.contains(point) {
 			delete(s.pointSet, point)
 			retired = true
 			continue
@@ -149,13 +150,20 @@ func (s *ContainerState) retirePointsInside(box domain.Box) {
 		return
 	}
 	s.points = kept
-	ordered := make([]domain.Point, 0, len(s.OrderedPoints))
+	// OrderedPoints holds exactly the points of points, so the same test retires the same set
+	// there without a lookup per point.
+	ordered := make([]domain.Point, 0, len(kept))
 	for _, point := range s.OrderedPoints {
-		if _, free := s.pointSet[point]; free {
+		if !bound.contains(point) {
 			ordered = append(ordered, point)
 		}
 	}
 	s.OrderedPoints = ordered
+}
+
+func (b Bound) contains(point domain.Point) bool {
+	x, y, z := point.X(), point.Y(), point.Z()
+	return b[0] <= x && x < b[3] && b[1] <= y && y < b[4] && b[2] <= z && z < b[5]
 }
 
 // AddDirect records a placement for solvers that never query extreme points. The grid builds
@@ -217,7 +225,7 @@ func (s *ContainerState) PlacementSignature() string {
 }
 
 // absorb adds the candidates that are inside the container, new and not inside a solid.
-// O(points x solids) for the inside test, plus O(points) per sorted insertion.
+// O(points x bucket) for the inside test, plus O(points) per sorted insertion.
 func (s *ContainerState) absorb(candidates []domain.Point) {
 	inner := s.Container.InnerDimensions()
 	length, width, height := inner.Length().Ticks(), inner.Width().Ticks(), inner.Height().Ticks()
@@ -237,10 +245,11 @@ func (s *ContainerState) absorb(candidates []domain.Point) {
 	}
 }
 
+// insideSolid tests only the point's own cell: a solid containing a point is filed under
+// that point's cell, so no other bucket can hold one.
 func (s *ContainerState) insideSolid(point domain.Point) bool {
-	x, y, z := point.X(), point.Y(), point.Z()
-	for _, b := range s.Bounds {
-		if b[0] <= x && x < b[3] && b[1] <= y && y < b[4] && b[2] <= z && z < b[5] {
+	for _, position := range s.Index.bucket(point.X(), point.Y(), point.Z()) {
+		if s.Bounds[position].contains(point) {
 			return true
 		}
 	}
@@ -286,31 +295,48 @@ func (s *ContainerState) exposedPoints(box domain.Box) []domain.Point {
 	}
 }
 
+// Each projection is the highest face at or below a ceiling among the solids whose footprint
+// covers the point on the other two axes. Such a solid ends inside the ceiling, so it is filed
+// under one of the cells of the ray below it: walking that ray visits every solid that can
+// contribute, and a maximum is indifferent to seeing one twice. O(cells per axis + bucket).
+
 func (s *ContainerState) surfaceZ(x, y, ceiling int64) int64 {
-	best := int64(0)
-	for _, b := range s.Bounds {
-		if b[5] <= ceiling && b[0] <= x && x < b[3] && b[1] <= y && y < b[4] && b[5] > best {
-			best = b[5]
+	index, best := s.Index, int64(0)
+	ix, iy := x/index.cellX, y/index.cellY
+	for iz := int64(0); iz < ceilDiv(ceiling, index.cellZ); iz++ {
+		for _, position := range index.cells[cellKey{ix, iy, iz}] {
+			b := s.Bounds[position]
+			if best < b[5] && b[5] <= ceiling && b[0] <= x && x < b[3] && b[1] <= y && y < b[4] {
+				best = b[5]
+			}
 		}
 	}
 	return best
 }
 
 func (s *ContainerState) surfaceY(x, z, ceiling int64) int64 {
-	best := int64(0)
-	for _, b := range s.Bounds {
-		if b[4] <= ceiling && b[0] <= x && x < b[3] && b[2] <= z && z < b[5] && b[4] > best {
-			best = b[4]
+	index, best := s.Index, int64(0)
+	ix, iz := x/index.cellX, z/index.cellZ
+	for iy := int64(0); iy < ceilDiv(ceiling, index.cellY); iy++ {
+		for _, position := range index.cells[cellKey{ix, iy, iz}] {
+			b := s.Bounds[position]
+			if best < b[4] && b[4] <= ceiling && b[0] <= x && x < b[3] && b[2] <= z && z < b[5] {
+				best = b[4]
+			}
 		}
 	}
 	return best
 }
 
 func (s *ContainerState) surfaceX(y, z, ceiling int64) int64 {
-	best := int64(0)
-	for _, b := range s.Bounds {
-		if b[3] <= ceiling && b[1] <= y && y < b[4] && b[2] <= z && z < b[5] && b[3] > best {
-			best = b[3]
+	index, best := s.Index, int64(0)
+	iy, iz := y/index.cellY, z/index.cellZ
+	for ix := int64(0); ix < ceilDiv(ceiling, index.cellX); ix++ {
+		for _, position := range index.cells[cellKey{ix, iy, iz}] {
+			b := s.Bounds[position]
+			if best < b[3] && b[3] <= ceiling && b[1] <= y && y < b[4] && b[2] <= z && z < b[5] {
+				best = b[3]
+			}
 		}
 	}
 	return best

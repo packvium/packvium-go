@@ -608,6 +608,9 @@ func decodeContainer(raw object, unit string) (*domain.Container, error) {
 	if spec.Axles, err = decodeAxles(raw, unit); err != nil {
 		return nil, err
 	}
+	if spec.AccessDirections, err = raw.strings("access_directions"); err != nil {
+		return nil, err
+	}
 	return domain.NewContainer(spec)
 }
 

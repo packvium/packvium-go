@@ -19,17 +19,24 @@ const noStop = math.MaxInt64
 // necessary and neither implies the other; the post-validator's whole-scene replay remains
 // the sufficient check.
 //
-// Opt-in twice over: inert unless the caller supplies exit directions (assuming all six walls
-// open would enforce a rule true of no real vehicle), and inert unless two distinct stops are
-// in play. The blocker set is strictly later stops: the order within a stop is free, so
+// Opt-in twice over: inert unless doors are stated (assuming all six walls open would enforce
+// a rule true of no real vehicle), and inert unless two distinct stops are in play. The doors
+// come from the container and fall back to the constructor's: two doors on one trailer and
+// none on another is the case that makes the rule worth having, so a container that states
+// its own doors overrides the default and one that states none inherits it. The blocker set is strictly later stops: the order within a stop is free, so
 // "later or equal" would refuse two same-stop pallets standing one behind the other.
 //
 // Per placement list the door table is O(n^2 * d); each candidate then costs O(n * d).
 // Mutable per-solve state, so one instance must not be shared between concurrent solves.
 type StopAccessibilityConstraint struct {
-	directions []string
+	defaultDirections []string
+	// doorsOf is the container doors was read from: containers are immutable, so its doors
+	// are copied once per container rather than once per candidate.
+	doorsOf    *domain.Container
+	doors      []string
 	placements []domain.Placement
 	container  domain.Dimensions
+	directions []string
 	primed     bool
 	clear      [][]string
 	stops      []int64
@@ -42,16 +49,24 @@ func NewStopAccessibilityConstraint(directions []string) (*StopAccessibilityCons
 	if err := domain.ValidateDirections(directions); err != nil {
 		return nil, err
 	}
-	var canonical []string
-	for _, direction := range domain.AllDirections {
-		for _, requested := range directions {
-			if requested == direction {
-				canonical = append(canonical, direction)
-				break
-			}
-		}
+	return &StopAccessibilityConstraint{defaultDirections: domain.CanonicalDirections(directions)}, nil
+}
+
+// inert reports whether the rule allows every candidate of a search: with no route, or with
+// no doors on the container and none by default, it can never reject.
+func (s *StopAccessibilityConstraint) inert(container *domain.Container, routeSensitive bool) bool {
+	return !routeSensitive || len(s.directionsFor(container)) == 0
+}
+
+// directionsFor is the container's own doors, or the default when it states none.
+func (s *StopAccessibilityConstraint) directionsFor(container *domain.Container) []string {
+	if s.doorsOf != container {
+		s.doorsOf, s.doors = container, container.AccessDirections()
 	}
-	return &StopAccessibilityConstraint{directions: canonical}, nil
+	if len(s.doors) > 0 {
+		return s.doors
+	}
+	return s.defaultDirections
 }
 
 func stopOf(placement domain.Placement) int64 {
@@ -76,9 +91,12 @@ func sweep(box domain.Box, inner domain.Dimensions, direction string) domain.Swe
 
 // baseFor computes, per placed box, the doors still open to it against the other placed
 // boxes. Keyed on the container too, because a corridor runs to a wall: the same boxes have
-// different exits in a longer container.
-func (s *StopAccessibilityConstraint) baseFor(current []domain.Placement, inner domain.Dimensions) {
-	if s.primed && s.container == inner && samePlacements(s.placements, current) {
+// different exits in a longer container. And on the doors, since two containers of the same
+// size with different doors have different answers for the same boxes.
+func (s *StopAccessibilityConstraint) baseFor(current []domain.Placement, inner domain.Dimensions,
+	directions []string) {
+	if s.primed && s.container == inner && sameDirections(s.directions, directions) &&
+		samePlacements(s.placements, current) {
 		return
 	}
 	stops := make([]int64, len(current))
@@ -90,18 +108,18 @@ func (s *StopAccessibilityConstraint) baseFor(current []domain.Placement, inner 
 	for index := range boxes {
 		if stops[index] == noStop {
 			// Never unloaded, so it needs no door of its own: it only ever blocks.
-			clear[index] = s.directions
+			clear[index] = directions
 			continue
 		}
 		var open []string
-		for _, direction := range s.directions {
+		for _, direction := range directions {
 			if !blockedByLater(sweep(boxes[index], inner, direction), boxes, stops, stops[index], index) {
 				open = append(open, direction)
 			}
 		}
 		clear[index] = open
 	}
-	s.placements, s.container, s.primed = append([]domain.Placement(nil), current...), inner, true
+	s.placements, s.container, s.directions, s.primed = append([]domain.Placement(nil), current...), inner, directions, true
 	s.clear, s.stops = clear, stops
 }
 
@@ -118,12 +136,16 @@ func blockedByLater(region domain.Sweep, boxes []domain.Box, stops []int64, stop
 
 // Evaluate implements PlacementConstraint.
 func (s *StopAccessibilityConstraint) Evaluate(context Context) Result {
-	if len(s.directions) == 0 || !context.RouteSensitive() {
+	if !context.RouteSensitive() {
+		return Allow()
+	}
+	directions := s.directionsFor(context.Container())
+	if len(directions) == 0 {
 		return Allow()
 	}
 	candidateStop := stopIndexOrNone(context.Item().Item().StopIndex())
 	inner := context.Container().InnerDimensions()
-	s.baseFor(context.Placements(), inner)
+	s.baseFor(context.Placements(), inner, directions)
 	// One distinct stop means nothing is due before anything else, so no corridor can be
 	// blocked by a later item. The candidate counts too, or the first placement into an
 	// empty container would skip a check it should make.
@@ -148,13 +170,26 @@ func (s *StopAccessibilityConstraint) Evaluate(context Context) Result {
 	for index, placement := range placed {
 		boxes[index] = placement.EnvelopeBox()
 	}
-	for _, direction := range s.directions {
+	for _, direction := range directions {
 		if !blockedByLater(sweep(candidate, inner, direction), boxes, s.stops, candidateStop, -1) {
 			return Allow()
 		}
 	}
 	return Reject("stop_accessibility_violation",
 		fmt.Sprintf("%s due at stop %d would have no exit", context.Item().ID(), candidateStop))
+}
+
+// sameDirections compares two canonical door lists. O(d).
+func sameDirections(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func distinctStops(stops []int64, candidate int64) bool {

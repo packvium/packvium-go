@@ -140,6 +140,11 @@ type ContainerSpec struct {
 	Metadata             interface{}
 	MaxStackDensity      *units.Weight
 	Axles                *[2]Axle
+	// AccessDirections are the walls the container can be unloaded through. Empty means the
+	// horizontal half of route order is not enforced for it, not that it is sealed: six
+	// doors would be a different nearly-vacuous rule and would change answers for every
+	// caller who never set the field.
+	AccessDirections []string
 }
 
 // Container is one validated, immutable container type.
@@ -165,6 +170,7 @@ func NewContainer(spec ContainerSpec) (*Container, error) {
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	frozen.AccessDirections = CanonicalDirections(spec.AccessDirections)
 	return &Container{spec: frozen, tags: NewTagSet(spec.Tags), tagLimitNames: names}, nil
 }
 
@@ -186,6 +192,9 @@ func validateContainer(spec ContainerSpec) error {
 		if limit < 1 {
 			return errors.New("tag_limits must be at least 1")
 		}
+	}
+	if err := ValidateDirections(spec.AccessDirections); err != nil {
+		return err
 	}
 	if spec.OuterDimensions != nil && !spec.InnerDimensions.FitsInside(*spec.OuterDimensions) {
 		return errors.New("outer dimensions cannot be smaller than inner dimensions")
@@ -230,6 +239,11 @@ func (c *Container) VoidFillReserveRatio() float64  { return c.spec.VoidFillRese
 func (c *Container) Metadata() interface{}          { return c.spec.Metadata }
 func (c *Container) MaxStackDensity() *units.Weight { return copyWeight(c.spec.MaxStackDensity) }
 func (c *Container) Axles() *[2]Axle                { return copyAxles(c.spec.Axles) }
+
+// AccessDirections are the container's doors in canonical order; empty when none are stated.
+func (c *Container) AccessDirections() []string {
+	return append([]string(nil), c.spec.AccessDirections...)
+}
 
 // TagLimitNames are the limited tags in ascending order.
 func (c *Container) TagLimitNames() []string { return append([]string(nil), c.tagLimitNames...) }

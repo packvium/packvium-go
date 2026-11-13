@@ -3,6 +3,7 @@ package algorithm
 import (
 	"encoding/json"
 	"math/big"
+	"os"
 	"os/exec"
 	"reflect"
 	"testing"
@@ -36,10 +37,19 @@ func bigOf(t *testing.T, text string) *big.Int {
 	return value
 }
 
+// sceneRef is the milestone this tree implements; PACKVIUM_CONFORMANCE_REF replays another
+// tag, as it does for the conformance corpus.
+func sceneRef() string {
+	if ref := os.Getenv("PACKVIUM_CONFORMANCE_REF"); ref != "" {
+		return ref
+	}
+	return "v1.1.0"
+}
+
 // TestMatchesTheSharedBoundCorpus recomputes the vectors the reference wrote at the tag. It
 // skips when the corpus cannot be read from git.
 func TestMatchesTheSharedBoundCorpus(t *testing.T) {
-	content, err := exec.Command("git", "show", "v1.0.0:conformance/scene/objective-bounds.json").Output()
+	content, err := exec.Command("git", "show", sceneRef()+":conformance/scene/objective-bounds.json").Output()
 	if err != nil {
 		t.Skipf("objective-bounds scene unavailable: %v", err)
 	}

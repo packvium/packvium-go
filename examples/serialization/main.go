@@ -27,6 +27,9 @@ import (
 
 type object = map[string]interface{}
 
+// time_limit_ms is a safety fuse, not a target: top_k asks the portfolio for runners-up, and
+// how many it finds is bounded by the wall clock unless a budget says otherwise, so without
+// it a loaded host could print a different number of alternatives.
 const requestJSON = `{
   "units": {"length": "mm"},
   "configuration": {
@@ -36,7 +39,8 @@ const requestJSON = `{
     "dimensional_weight_weight_unit": "kg",
     "profile": "balanced",
     "seed": 42,
-    "top_k": 2
+    "top_k": 2,
+    "time_limit_ms": 60000
   },
   "items": [
     {"id": "book", "quantity": 6, "dimensions": {"length": "210", "width": "140", "height": "30"}, "weight": "450 g"},
@@ -119,9 +123,11 @@ func main() {
 		fmt.Println("unknown objective:", truncate(err.Error(), 100))
 	}
 
-	refused := "none"
-	if !serialization.CurrentlyUnsupported.Empty() {
-		refused = fmt.Sprintf("%+v", serialization.CurrentlyUnsupported)
+	// A field the contract reserves before any engine implements it is refused by name too:
+	// container.pallet_overhang_limit is the one 1.1.0 reserves.
+	var refused interface{} = "none"
+	if unsupported := serialization.CurrentlyUnsupported; !unsupported.Empty() {
+		refused = refusedByScope(unsupported)
 	}
 	fmt.Println("fields this engine refuses by name:", refused)
 
@@ -133,6 +139,18 @@ func main() {
 
 	fmt.Println()
 	fmt.Println("the CLI takes exactly the document above:  echo '...' | go run ./cmd/packvium")
+}
+
+// refusedByScope keeps only the scopes that refuse something, as the reference prints them.
+func refusedByScope(unsupported serialization.UnsupportedFields) map[string][]string {
+	scopes := map[string][]string{"request": unsupported.Request, "configuration": unsupported.Configuration,
+		"item": unsupported.Item, "container": unsupported.Container, "shape_type": unsupported.ShapeTypes}
+	for scope, fields := range scopes {
+		if len(fields) == 0 {
+			delete(scopes, scope)
+		}
+	}
+	return scopes
 }
 
 // wireOrder is the field order of a placement as the result contract tabulates it; JSON

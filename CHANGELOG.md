@@ -4,6 +4,27 @@ What changed in the Go module `github.com/packvium/packvium-go`, release by rele
 format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0]
+
+Answers every request the way Packvium 1.1.0 does in the other languages, checked byte for
+byte against the 1.1.0 conformance corpus: 398 packing fixtures, 6 refusal cases and 55
+commerce cases.
+
+### Added
+
+- **Container doors.** `container.access_directions` (`domain.ContainerSpec.AccessDirections`)
+  names the walls a container is unloaded through. With doors stated, nothing due at a later
+  stop may block an earlier item's way out through them. Doors are validated against the six
+  faces and kept in canonical order; without them the rule stays off and results are as in
+  1.0.x.
+
+### Changed
+
+- `container.pallet_overhang_limit` is reserved by the 1.1.0 contract and refused with
+  `unsupported_feature` until an engine implements it.
+- Faster candidate search: rules that cannot fire for an item are skipped once per search,
+  and collision and surface queries use the spatial grid. Results are unchanged.
+
 ## [1.0.1]
 
 ### Changed

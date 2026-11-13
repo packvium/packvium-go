@@ -48,3 +48,18 @@ func ValidateDirections(directions []string) error {
 	}
 	return nil
 }
+
+// CanonicalDirections deduplicates doors into the AllDirections order, so two callers naming
+// the same doors differently search identically. O(d).
+func CanonicalDirections(directions []string) []string {
+	var canonical []string
+	for _, direction := range AllDirections {
+		for _, requested := range directions {
+			if requested == direction {
+				canonical = append(canonical, direction)
+				break
+			}
+		}
+	}
+	return canonical
+}

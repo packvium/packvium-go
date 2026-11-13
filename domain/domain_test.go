@@ -8,7 +8,8 @@ import (
 	"github.com/packvium/packvium-go/units"
 )
 
-// Expected messages were produced by the reference engine's models at v1.0.0, case by case.
+// Expected messages were produced by the reference engine's models at v1.0.0, case by case;
+// the access_directions cases at v1.1.0.
 
 func cube(t *testing.T) Dimensions {
 	t.Helper()
@@ -81,6 +82,8 @@ func TestContainerRefusalsMatchReference(t *testing.T) {
 		{func(s *ContainerSpec) { s.Axles = &backwards }, "the front axle must be strictly nearer the origin than the rear axle"},
 		{func(s *ContainerSpec) { s.Axles = &beyond }, "axle positions must lie within the container's length"},
 		{func(s *ContainerSpec) { s.TagLimits = map[string]int64{"x": 0} }, "tag_limits must be at least 1"},
+		{func(s *ContainerSpec) { s.AccessDirections = []string{"up"} },
+			"unknown movement direction 'up'; expected one of ('+x', '-x', '+y', '-y', '+z', '-z')"},
 		{func(s *ContainerSpec) { s.OuterDimensions = &small }, "outer dimensions cannot be smaller than inner dimensions"},
 		{func(s *ContainerSpec) { s.Obstacles = []Obstacle{NewObstacle("o", NewBox(Point{}, sliver), nil)} }, "obstacle o lies outside container"},
 	}
@@ -90,6 +93,16 @@ func TestContainerRefusalsMatchReference(t *testing.T) {
 		if _, err := NewContainer(spec); err == nil || err.Error() != c.want {
 			t.Errorf("got %v, want %q", err, c.want)
 		}
+	}
+}
+
+func TestContainerDoorsAreCanonical(t *testing.T) {
+	container, err := NewContainer(ContainerSpec{ID: "c", InnerDimensions: cube(t), AccessDirections: []string{"-z", "+x", "+x"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := container.AccessDirections(); len(got) != 2 || got[0] != "+x" || got[1] != "-z" {
+		t.Fatalf("doors %v, want [+x -z]", got)
 	}
 }
 

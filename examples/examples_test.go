@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// The Python examples' output at v1.0.0, kept beside the programs so the test runs wherever
+// The Python examples' output at v1.1.0, kept beside the programs so the test runs wherever
 // the module does, with no checkout of the suite repository.
 const referenceDirectory = "testdata"
 
@@ -29,6 +29,7 @@ var languageWording = map[string]map[string]string{
 	},
 	"serialization": {
 		"  what one looks like, from an engine that is not: unsupported_feature: the Go engine does not yet implement item.shape_type=convex_hull; the request was rejecte": "  what one looks like, from an engine that is not: unsupported_feature: the Python engine does not yet implement item.shape_type=convex_hull; the request was rej",
+		"fields this engine refuses by name: map[container:[pallet_overhang_limit]]":                                                                                        "fields this engine refuses by name: {'container': ('pallet_overhang_limit',)}",
 		"the CLI takes exactly the document above:  echo '...' | go run ./cmd/packvium":                                                                                     "the CLI takes exactly the document above:  echo '...' | python3 -m packvium",
 	},
 	"extensions": {

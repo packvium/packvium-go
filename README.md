@@ -8,14 +8,14 @@ over another one. It accepts the same requests and returns the same results as t
 PHP, Java and .NET engines. Its tests run the shared conformance corpus, and every result
 matches the reference result byte for byte.
 
-> **Version 1.0.0.** This release corresponds to Packvium 1.0.0 in the other languages, and
-> its tests run the 1.0.0 conformance corpus: every packing fixture and every commerce case.
+> **Version 1.1.0.** This release corresponds to Packvium 1.1.0 in the other languages, and
+> its tests run the 1.1.0 conformance corpus: every packing fixture and every commerce case.
 > Field names, status codes and the objective vector stay the same for all of 1.x.
 
 ## Install
 
 ```bash
-go get github.com/packvium/packvium-go@v1.0.1
+go get github.com/packvium/packvium-go@v1.1.0
 ```
 
 Go 1.13 or newer. The module is checked on a real Go 1.13 toolchain, so projects that
@@ -120,7 +120,12 @@ is the same for the commerce API.
   item is placed.
 - **Real constraints.** Weight and payload limits, allowed rotations, keep-upright,
   floor-only, non-stackable, top-load limits, minimum support ratio, incompatible tags,
-  clearance, obstacles, axle loads and multi-stop routes.
+  clearance, obstacles, axle loads and multi-stop routes. A container can name its doors
+  (`access_directions`, any of `+x -x +y -y +z -z`): then nothing due at a later stop may
+  block an earlier item's way out through them. Without doors that rule stays off.
+- **Reserved fields are refused, not ignored.** `container.pallet_overhang_limit` is part of
+  the 1.1.0 contract but not implemented yet by any engine, so a request that sets it is
+  refused with `unsupported_feature`.
 - **Several solvers, not one.** Grid, layer, extreme-point, maximal-space, homogeneous-block
   and exact search for small problems.
 - **Checked answers.** An independent validator checks every solution again, and every item
