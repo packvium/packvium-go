@@ -114,7 +114,12 @@ func main() {
 	payload := weight("20 lb")
 	carton, err := domain.NewContainer(domain.ContainerSpec{ID: "carton", InnerDimensions: dimensions("in", "13", "10", "4"), MaxPayload: &payload})
 	check(err)
-	balanced, err := config.New(config.Default(config.Balanced))
+	// An example must not change answer merely because the host was busy. This solve needs
+	// a fraction of the budget below; the generous wall-clock value is only a safety fuse, so
+	// a loaded machine cannot cut the multi-start portfolio short and let a different start win.
+	options := config.Default(config.Balanced)
+	options.TimeLimitMS = 60_000
+	balanced, err := config.New(options)
 	check(err)
 	result, err := packer.New(balanced, algorithm.NoExtensions()).Pack([]*domain.Item{item}, []*domain.Container{carton})
 	check(err)

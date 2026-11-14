@@ -46,7 +46,12 @@ func main() {
 		container(domain.ContainerSpec{ID: "box-l", InnerDimensions: dimensions("500", "400", "350", "mm"), MaxPayload: &large, CostMinor: 250}),
 	}
 
-	balanced, err := config.New(config.Default(config.Balanced))
+	// An example must not change answer merely because the host was busy. This solve needs
+	// a fraction of the budget below; the generous wall-clock value is only a safety fuse, so
+	// a loaded machine cannot cut the multi-start portfolio short and let a different start win.
+	options := config.Default(config.Balanced)
+	options.TimeLimitMS = 60_000
+	balanced, err := config.New(options)
 	check(err)
 	result, err := packer.New(balanced, algorithm.NoExtensions()).Pack([]*domain.Item{item(book), item(mug)}, containers)
 	check(err)

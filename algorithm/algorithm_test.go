@@ -57,6 +57,36 @@ func TestStableOrderKeepsTiesInInputOrder(t *testing.T) {
 	}
 }
 
+// The bounded selection must be exactly the stable sort cut to the limit, ties included:
+// scores repeat heavily here, and each candidate's X records its enumeration position.
+func TestBoundedSelectionIsTheStableSortCutToTheLimit(t *testing.T) {
+	random := NewDeterministicRandom(11)
+	var all []Candidate
+	for index := 0; index < 200; index++ {
+		all = append(all, Candidate{Point: domain.MustPoint(int64(index), 0, 0),
+			Score: SortKey{Int(random.NextInt(4)), Int(random.NextInt(3))}})
+	}
+	for _, limit := range []int{2, 3, 7, 50, 199, 200, 500} {
+		bounded := &scan{max: limit}
+		for _, candidate := range all {
+			bounded.keep(candidate)
+		}
+		order := stableOrder(len(all), func(index int) SortKey { return all[index].Score })
+		if len(order) > limit {
+			order = order[:limit]
+		}
+		got := bounded.result()
+		if len(got) != len(order) {
+			t.Fatalf("limit %d: kept %d, want %d", limit, len(got), len(order))
+		}
+		for position, index := range order {
+			if got[position].Point != all[index].Point {
+				t.Fatalf("limit %d: position %d holds candidate %d, want %d", limit, position, got[position].Point.X(), index)
+			}
+		}
+	}
+}
+
 func TestSpatialIndexReturnsEachBoundOnceInFirstSeenOrder(t *testing.T) {
 	index := NewSpatialIndex(80, 80, 80)
 	index.Add(0, Bound{0, 0, 0, 80, 80, 80})

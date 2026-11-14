@@ -88,6 +88,13 @@ func Canonical(value interface{}) (string, error) {
 	if err := rejectFloats(value); err != nil {
 		return "", err
 	}
+	return Compact(value)
+}
+
+// Compact is json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False) itself:
+// Canonical's spelling, with a float written the way the reference writes it rather than
+// refused. For documents whose contract carries a caller's value through unchanged.
+func Compact(value interface{}) (string, error) {
 	var builder strings.Builder
 	err := write(&builder, value, "", "", ":")
 	return builder.String(), err

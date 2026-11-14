@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// The Python examples' output at v1.1.0, kept beside the programs so the test runs wherever
+// The Python examples' output at v1.2.0, kept beside the programs so the test runs wherever
 // the module does, with no checkout of the suite repository.
 const referenceDirectory = "testdata"
 
@@ -37,6 +37,26 @@ var languageWording = map[string]map[string]string{
 	},
 	"commerce": {
 		"   nothing matched, so the shipment is allowed with no citation: nil": "   nothing matched, so the shipment is allowed with no citation: None",
+	},
+	"execution": {
+		// The reference's section 4 speaks for its four engines and names its JavaScript
+		// example; this port's text speaks for this engine instead.
+		"4. One plan, every engine, the same bytes":                                         "4. One plan, four engines, the same bytes",
+		"  Hand the same *result* to any Packvium adapter, this one included, and it emits": "  Hand the same *result* to all four adapters and they emit the same bytes. That",
+		"  the same bytes. That is stricter than the packing contract, and it can be: a":    "  is stricter than the packing contract, and it can be: a plan is derived from a",
+		"  plan is derived from a result, so there is nothing left to differ about.":        "  result, so there is nothing left to differ about.",
+		"  It does not follow that every engine packing the same *request* agrees. This":    "  It does not follow that four engines packing the same *request* agree. Python",
+		"  engine, like Python and PHP, is held to identical placements and produces this":  "  and PHP are held to identical placements and do produce this exact form; Rust",
+		"  exact form; the Rust and JavaScript engines are held to a valid answer at or":    "  and JavaScript are held to a valid answer at or above the objective floor, and",
+		"  above the objective floor, so their plan for this request can be a different":    "  `examples/execution.mjs` prints 1280 bytes here rather than 1877 for that",
+		"  length. Whose packing is better is a question the plan never answers.":           "  reason. Whose packing is better is a question the plan never answers.",
+		"  preserved: true":                      "  preserved: True",
+		"  the approved plan is untouched: true": "  the approved plan is untouched: True",
+		"  a lock the solve cannot honour -> preserved=false, 1 lock reported back": "  a lock the solve cannot honour -> preserved=False, 1 lock reported back",
+	},
+	"intelligence": {
+		"  minimum_confidence=0.9 -> nil":                                                 "  minimum_confidence=0.9 -> None",
+		"  met. `nil` is the whole answer: there is no low-confidence proposal to weigh.": "  met. `None` is the whole answer: there is no low-confidence proposal to weigh.",
 	},
 }
 

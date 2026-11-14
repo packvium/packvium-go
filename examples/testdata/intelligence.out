@@ -1,0 +1,71 @@
+==============================================================================
+1. Two scenarios, compared order by order
+==============================================================================
+
+  order-1: treatment
+  order-2: treatment
+  order-3: no winner — baseline and treatment are both Pareto-optimal
+  order-4: treatment
+  order-5: baseline
+
+  order-3 has no winner because the trade-off is real: the proposed cartons cost
+  more and pack denser. A blended score would have picked one and hidden that.
+
+  order-5 names `baseline` as winner for a duller reason — the proposed cartons
+  produced no answer there, so there was only one candidate to be optimal. That
+  is not a baseline win, and the next step is careful not to count it as one.
+
+==============================================================================
+2. A proposal, or an explicit refusal to make one
+==============================================================================
+
+  minimum_confidence=0.9 -> None
+  Four of five orders are comparable, so confidence is 0.80 and the bar is not
+  met. `None` is the whole answer: there is no low-confidence proposal to weigh.
+
+  minimum_confidence=0.75 -> rec-cartons-2024
+  supported by: order-1, order-2, order-3, order-4
+  confidence:   0.80
+    cost_minor   1455.000 -> 1380.000
+    utilisation     0.708 ->    0.750
+
+  order-5 is absent from the supporting orders. A delta is a paired comparison,
+  so an order only one arm could pack contributes to neither mean.
+
+==============================================================================
+3. Replay against history the proposal has never seen
+==============================================================================
+
+  split_at=500 — required, with no default, because how much history is enough
+  is a claim about your business that this library cannot make for you.
+
+  training: order-1, order-2
+  held out: shipment-101, shipment-102, shipment-103, shipment-104
+
+    shipment-101   improved
+    shipment-102   traded_off
+    shipment-103   regressed  (treatment rejected: unsupported_item)
+    shipment-104   improved  (baseline actually suffered: damage)
+
+  improved 2, regressed 1, traded off 1, unpackable 0
+
+  shipment-104's note is negative evidence about the baseline, not a reason the
+  treatment won. Damage, returns, repacks and operator overrides happened under
+  the carton that actually shipped, so they are reported against that arm and
+  never credited to the one that was never tried.
+
+  shipment-103 is the one to read twice. The proposed cartons packed it for 1050
+  against 1600 and denser besides — and the independent validator rejected the
+  placement, so it counts as a regression. There is no cost at which a packing
+  your validator refuses becomes an improvement; the metrics are discarded, not
+  discounted.
+
+==============================================================================
+4. A proposal cannot be scored on its own evidence
+==============================================================================
+
+  refused: recommendation 'rec-cartons-2024' cites held-out decision(s) ['order-1']; it may not be scored on its own evidence
+
+  The refusal is the feature. A holdout score is worth exactly as much as the
+  separation between the evidence that produced the proposal and the evidence
+  that tests it, and nothing else in the call can enforce that separation.

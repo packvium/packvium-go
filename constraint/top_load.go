@@ -11,7 +11,7 @@ import "github.com/packvium/packvium-go/domain"
 // one search state, so one base per placement list is kept and each candidate is appended to
 // it. The cache is a single entry: search evaluates a run of candidates against one state
 // before moving on. Per candidate: O(n) to recognise the state and extend the graph, plus
-// O(n log n + E) for the load vector. Mutable per-solve state, so one instance must not be
+// O(n + E) for the load vector, whose order is the base's with the candidate inserted. Mutable per-solve state, so one instance must not be
 // shared between concurrent solves.
 type TopLoadConstraint struct {
 	placements []domain.Placement

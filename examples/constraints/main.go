@@ -148,8 +148,15 @@ func explanation(unpacked domain.UnpackedItem) string {
 	return text
 }
 
+// An example must not change answer merely because the host was busy. These solves need a
+// fraction of the budget; the generous wall-clock value is only a safety fuse, so a loaded
+// machine cannot cut the multi-start portfolio short and let a different start win.
+const safetyFuseMS = 60_000
+
 func pack(items []*domain.Item, containers []*domain.Container) *result.PackingResult {
-	balanced, err := config.New(config.Default(config.Balanced))
+	options := config.Default(config.Balanced)
+	options.TimeLimitMS = safetyFuseMS
+	balanced, err := config.New(options)
 	check(err)
 	outcome, err := packer.New(balanced, algorithm.NoExtensions()).Pack(items, containers)
 	check(err)

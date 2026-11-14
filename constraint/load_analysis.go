@@ -3,7 +3,6 @@ package constraint
 import (
 	"math/big"
 	"math/bits"
-	"sort"
 
 	"github.com/packvium/packvium-go/compression"
 	"github.com/packvium/packvium-go/domain"
@@ -19,7 +18,7 @@ const SquareMetreTicks = (1000 * units.TicksPerMM) * (1000 * units.TicksPerMM)
 //
 // Search code that already owns an incremental LoadSupportGraph uses this session, so the
 // graph and its derived load and ancestor vectors are each computed at most once. The load
-// vector is O(n log n + E) once the graph exists; the ancestor sets are O(n^2) worst case, as
+// vector is O(n log n + E) once the graph exists (O(n + E) for a graph extended by one unit); the ancestor sets are O(n^2) worst case, as
 // the reference's are. Every query is O(n) and never rebuilds contact geometry. Not safe for
 // concurrent use: the vectors are memoised on first use.
 type LoadAnalysis struct {
@@ -53,22 +52,10 @@ func (a *LoadAnalysis) loads() []int64 {
 
 func (a *LoadAnalysis) computeTopLoads() []int64 {
 	loads := make([]int64, len(a.units))
-	order := make([]int, len(a.units))
-	for index := range order {
-		order[index] = index
-	}
 	// Highest top first, then highest bottom, then index: every unit is visited after
-	// everything that can rest on it.
-	sort.Slice(order, func(left, right int) bool {
-		l, r := a.units[order[left]].Box, a.units[order[right]].Box
-		if l.Z2() != r.Z2() {
-			return l.Z2() > r.Z2()
-		}
-		if l.Origin().Z() != r.Origin().Z() {
-			return l.Origin().Z() > r.Origin().Z()
-		}
-		return order[left] < order[right]
-	})
+	// everything that can rest on it. The graph holds the order, so a candidate appended to
+	// a settled state pays for one insertion rather than a sort.
+	order := a.graph.descendingOrder()
 	for _, upper := range order {
 		supports := a.graph.Supporters(upper)
 		totalArea := int64(0)

@@ -67,8 +67,14 @@ func main() {
 	fmt.Println("maximum_value    ", "packed:", list(kept), "left behind:", list(left))
 }
 
+// An example must not change answer merely because the host was busy. These solves need a
+// fraction of the budget; the generous wall-clock value is only a safety fuse, so a loaded
+// machine cannot cut the multi-start portfolio short and let a different start win.
+const safetyFuseMS = 60_000
+
 func options(objective string) config.Options {
 	options := config.Default(config.Balanced)
+	options.TimeLimitMS = safetyFuseMS
 	if objective != "" {
 		options.Objective = objective
 	}

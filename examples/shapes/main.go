@@ -35,6 +35,10 @@ func summarise(label string, request object) {
 
 func pack(request object) object {
 	request["units"] = object{"length": "mm"}
+	// An example must not change answer merely because the host was busy. These solves need
+	// a fraction of the budget; the generous wall-clock value is only a safety fuse, so a
+	// loaded machine cannot cut the multi-start portfolio short and let a different start win.
+	request["configuration"] = object{"time_limit_ms": int64(60_000)}
 	result, err := serialization.Pack(request)
 	if err != nil {
 		log.Fatal(err)

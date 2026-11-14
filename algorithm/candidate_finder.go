@@ -18,8 +18,10 @@ const unlimited = -1
 // points; max of unlimited keeps them all, otherwise at most max. restricted, when non-nil,
 // limits the scan to those origins.
 //
-// O(p * r * (q + k)) per call for p scanned points (capped at maxCandidatePoints), r distinct
-// rotations, q solids returned by the spatial index per query and k constraint checks.
+// O(p * r * (q + k + log m)) per call for p scanned points (capped at maxCandidatePoints), r
+// distinct rotations, q solids returned by the spatial index per query, k constraint checks
+// and a limit of m > 1 (bounded selection, O(m) space); unlimited adds O(f log f) for the f
+// feasible candidates it sorts.
 func FindCandidates(state *ContainerState, item domain.ItemInstance, cfg *config.PackingConfig,
 	constraints []constraint.PlacementConstraint, stats *SearchStats, deadline *Deadline, scorer CandidateScorer,
 	max int, restricted []domain.Point) []Candidate {
@@ -223,6 +225,24 @@ type scan struct {
 	clearance            int64
 	found                []Candidate
 	best                 *Candidate
+	// retained is a heap of the best max candidates so far, worst at the root, used when
+	// max > 1; ordinal numbers the candidates that reach it, the stable sort's tie-break.
+	retained []rankedCandidate
+	ordinal  int
+}
+
+// rankedCandidate is a retained candidate and its enumeration ordinal.
+type rankedCandidate struct {
+	candidate Candidate
+	ordinal   int
+}
+
+// worse is the bounded selection's order: a larger score, or an equal one found later.
+func (r rankedCandidate) worse(other rankedCandidate) bool {
+	if order := r.candidate.Score.Compare(other.candidate.Score); order != 0 {
+		return order > 0
+	}
+	return r.ordinal > other.ordinal
 }
 
 func newScan(state *ContainerState, item domain.ItemInstance, cfg *config.PackingConfig,
@@ -364,34 +384,97 @@ func (s *scan) exceedsReserve(reservePlacement domain.Placement) bool {
 	return projected.Cmp(s.state.UsableVolume()) > 0
 }
 
+// keep offers one feasible candidate to the call's limit. It has already been counted and
+// scored, so the limit changes only which candidates are held, never a counter.
 func (s *scan) keep(candidate Candidate) {
-	if s.max == 1 {
+	switch {
+	case s.max == 1:
 		if s.best == nil || candidate.Score.Compare(s.best.Score) < 0 {
 			kept := candidate
 			s.best = &kept
 		}
+	case s.max > 1:
+		s.retain(candidate)
+	case s.max == unlimited:
+		s.found = append(s.found, candidate)
+	}
+}
+
+// retain holds the best max candidates in a heap whose root is the worst of them, so the
+// selection is exactly a stable sort cut to max, without holding or sorting every feasible
+// placement: O(log k) per candidate that enters and one comparison per one that does not,
+// O(k) space for k = max, against O(f) space and O(f log f) time for f candidates.
+func (s *scan) retain(candidate Candidate) {
+	entry := rankedCandidate{candidate, s.ordinal}
+	s.ordinal++
+	if len(s.retained) < s.max {
+		if s.retained == nil {
+			s.retained = make([]rankedCandidate, 0, s.max)
+		}
+		s.retained = append(s.retained, entry)
+		siftUp(s.retained, len(s.retained)-1)
 		return
 	}
-	s.found = append(s.found, candidate)
+	// An equal score never enters: the one already held was found earlier.
+	if !s.retained[0].worse(entry) {
+		return
+	}
+	s.retained[0] = entry
+	siftDown(s.retained, 0)
+}
+
+func siftUp(heap []rankedCandidate, index int) {
+	for index > 0 {
+		parent := (index - 1) / 2
+		if !heap[index].worse(heap[parent]) {
+			return
+		}
+		heap[index], heap[parent] = heap[parent], heap[index]
+		index = parent
+	}
+}
+
+func siftDown(heap []rankedCandidate, index int) {
+	for {
+		worst, left := index, 2*index+1
+		if left < len(heap) && heap[left].worse(heap[worst]) {
+			worst = left
+		}
+		if right := left + 1; right < len(heap) && heap[right].worse(heap[worst]) {
+			worst = right
+		}
+		if worst == index {
+			return
+		}
+		heap[index], heap[worst] = heap[worst], heap[index]
+		index = worst
+	}
 }
 
 func (s *scan) result() []Candidate {
-	if s.max == 1 {
+	switch {
+	case s.max == 1:
 		if s.best == nil {
 			return nil
 		}
 		return []Candidate{*s.best}
+	case s.max > 1:
+		// Ordinals are distinct, so the order is total and an unstable sort is exact.
+		sort.Slice(s.retained, func(i, j int) bool { return s.retained[j].worse(s.retained[i]) })
+		out := make([]Candidate, len(s.retained))
+		for position, entry := range s.retained {
+			out[position] = entry.candidate
+		}
+		return out
+	case s.max == unlimited:
+		order := stableOrder(len(s.found), func(index int) SortKey { return s.found[index].Score })
+		out := make([]Candidate, len(order))
+		for position, index := range order {
+			out[position] = s.found[index]
+		}
+		return out
 	}
-	order := stableOrder(len(s.found), func(index int) SortKey { return s.found[index].Score })
-	limit := len(order)
-	if s.max != unlimited && s.max < limit {
-		limit = s.max
-	}
-	out := make([]Candidate, limit)
-	for position := 0; position < limit; position++ {
-		out[position] = s.found[order[position]]
-	}
-	return out
+	return nil
 }
 
 // SupportRatio is the reported support fraction, from resting contact with other placements

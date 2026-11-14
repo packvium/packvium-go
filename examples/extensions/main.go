@@ -102,8 +102,15 @@ func load(packed *domain.PackedContainer) int64 {
 	return total
 }
 
+// An example must not change answer merely because the host was busy. These solves need a
+// fraction of the budget; the generous wall-clock value is only a safety fuse, so a loaded
+// machine cannot cut the multi-start portfolio short and let a different start win.
+const safetyFuseMS = 60_000
+
 func main() {
-	balanced, err := config.New(config.Default(config.Balanced))
+	options := config.Default(config.Balanced)
+	options.TimeLimitMS = safetyFuseMS
+	balanced, err := config.New(options)
 	check(err)
 
 	// The footprint is deliberately only as wide as one crate, so the column has to grow

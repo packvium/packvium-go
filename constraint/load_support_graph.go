@@ -50,6 +50,10 @@ type LoadSupportGraph struct {
 	// Only populated with nesting; without it this graph is the face graph.
 	nestedSupporters [][]ContactEdge
 	nestedChildren   [][]int
+	// descending is the load order, memoised on first use. prior is the parent's order when
+	// this graph is the parent plus one unit, so the order is one insertion away.
+	descending []int
+	prior      []int
 }
 
 // NewLoadSupportGraph builds the support graph over units; cellHint is as for
@@ -143,7 +147,47 @@ func (g *LoadSupportGraph) WithUnit(unit LoadUnit, cellHint int64) *LoadSupportG
 	}
 	// Without nesting this graph is the face graph, so its edges are read straight off it
 	// rather than patched by a second implementation of the same rule.
-	return &LoadSupportGraph{face: g.face.WithBox(unit.Box), units: extended}
+	// Candidates evaluated against one state all extend the same parent, so its order is
+	// settled once and each child inherits it.
+	return &LoadSupportGraph{face: g.face.WithBox(unit.Box), units: extended, prior: g.descendingOrder()}
+}
+
+// descendingOrder is every unit index, highest top first, then highest bottom, then index:
+// each unit comes after everything that can rest on it. O(n log n) once per graph, or, for a
+// graph extended by one unit, a binary search and an O(n) copy of the parent's order. The
+// slice is shared and must not be modified; not safe for concurrent use.
+func (g *LoadSupportGraph) descendingOrder() []int {
+	if g.descending != nil || len(g.units) == 0 {
+		return g.descending
+	}
+	if g.prior == nil {
+		g.descending = make([]int, len(g.units))
+		for index := range g.descending {
+			g.descending[index] = index
+		}
+		sort.Slice(g.descending, func(left, right int) bool {
+			return g.loadsBefore(g.descending[left], g.descending[right])
+		})
+		return g.descending
+	}
+	added := len(g.units) - 1
+	at := sort.Search(len(g.prior), func(position int) bool { return g.loadsBefore(added, g.prior[position]) })
+	order := make([]int, 0, len(g.units))
+	order = append(append(append(order, g.prior[:at]...), added), g.prior[at:]...)
+	g.descending, g.prior = order, nil
+	return g.descending
+}
+
+// loadsBefore is the load order's comparison; the index makes it total.
+func (g *LoadSupportGraph) loadsBefore(left, right int) bool {
+	l, r := g.units[left].Box, g.units[right].Box
+	if l.Z2() != r.Z2() {
+		return l.Z2() > r.Z2()
+	}
+	if l.Origin().Z() != r.Origin().Z() {
+		return l.Origin().Z() > r.Origin().Z()
+	}
+	return left < right
 }
 
 // Supporters is what index directly bears on. The slice is shared and must not be modified.

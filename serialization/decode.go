@@ -91,6 +91,37 @@ func Decode(raw interface{}) (*DecodedRequest, error) {
 	}, nil
 }
 
+// DecodeItems reads only the item types of a wire request, in its own length unit: what a
+// caller needs to size a box from an item type before deciding whether to solve at all. A
+// request with no items has none, as in the reference; Decode is what refuses one.
+func DecodeItems(raw interface{}) ([]*domain.Item, error) {
+	request, ok := raw.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("request must be an object")
+	}
+	fields := object(request)
+	unitsBlock, err := child(fields, "units")
+	if err != nil {
+		return nil, err
+	}
+	if _, present := fields.get("items"); !present {
+		return nil, nil
+	}
+	entries, err := decodeAll(fields, "items")
+	if err != nil {
+		return nil, err
+	}
+	items := make([]*domain.Item, 0, len(entries))
+	for _, entry := range entries {
+		item, err := decodeItem(entry, unitsBlock.text("length", "mm"))
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
 func child(fields object, key string) (object, error) {
 	value, _ := fields.get(key)
 	return asObject(value, key)

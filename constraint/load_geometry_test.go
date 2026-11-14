@@ -59,6 +59,12 @@ func TestAppendingABoxMatchesAFreshBuild(t *testing.T) {
 	for index := range scene {
 		assertEqual(t, built.Supporters(index), grown.Supporters(index))
 	}
+	// The grown graph inserts into its parent's load order rather than sorting; every
+	// prefix must land where a fresh sort puts it.
+	for length := 1; length <= len(all); length++ {
+		inserted := NewLoadSupportGraph(all[:length-1], 10).WithUnit(all[length-1], 10)
+		assertEqual(t, NewLoadSupportGraph(all[:length], 1).descendingOrder(), inserted.descendingOrder())
+	}
 }
 
 func TestLoadsPropagateWithTheRemainderOnTheLastSupporter(t *testing.T) {
