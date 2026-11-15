@@ -36,6 +36,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/packvium/packvium-go/internal/canonicaljson"
 	"github.com/packvium/packvium-go/internal/jsonvalue"
 )
 
@@ -48,8 +49,11 @@ const Format = "packvium-execution-plan/v1"
 // meaning.
 const unnamedAxis = "unnamed objective axis"
 
-// PlanError reports a result the adapter cannot describe.
+// PlanError reports a result the adapter cannot describe, or a plan with no canonical
+// spelling. Code is empty for the adapter's own refusals; for CanonicalPlanJSON's it is the
+// RFC 8785 rule the plan broke: number_out_of_range, invalid_string or invalid_value.
 type PlanError struct {
+	Code    string
 	Message string
 }
 
@@ -482,11 +486,18 @@ func text(value interface{}) (string, error) {
 	return "", planError("cannot render a value of type %T in a sentence", value)
 }
 
-// CanonicalPlanJSON is the one byte-comparable spelling of a plan: the reference's
-// json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False). Cross-language
-// equality is asserted on this string rather than on a parsed object, so key order and
-// whitespace cannot make two identical plans look different. O(n log n) in the plan size,
-// for the key sorts.
+// CanonicalPlanJSON is the one byte-comparable spelling of a plan. Cross-language equality is
+// asserted on this string rather than on a parsed object, so key order and whitespace cannot
+// make two identical plans look different. O(n log n) in the plan size, for the key sorts.
+//
+// The spelling is RFC 8785, shared with the operational artifact. Until 1.3.0 it was
+// json.dumps(sort_keys=True), the same bytes for every plan an engine emits but not for a key
+// outside the Basic Multilingual Plane or a float, where the engines disagreed. A plan
+// carrying a number beyond 2^53 - 1 or a string that is not UTF-8 is refused.
 func CanonicalPlanJSON(plan map[string]interface{}) (string, error) {
-	return jsonvalue.Compact(plan)
+	text, err := canonicaljson.Marshal(plan)
+	if refusal, ok := err.(*canonicaljson.Error); ok {
+		return "", &PlanError{Code: refusal.Code, Message: refusal.Message}
+	}
+	return text, err
 }

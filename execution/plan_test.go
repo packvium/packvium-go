@@ -14,10 +14,12 @@ import (
 )
 
 // testdata/reference-cases.json was produced by running each result through the reference
-// engine's packvium.execution at v1.2.0: "plan" is canonical_plan_json(build_execution_plan(
-// {}, result, loading_orders=...)), "error" the ExecutionPlanError message. The cases cover
-// what the golden corpus cannot: alternatives, floats, unplaced items, injected orders,
-// integers past int64 and every character json.dumps treats specially.
+// engine's packvium.execution at v1.3.0: "plan" is canonical_plan_json(build_execution_plan(
+// {}, result, loading_orders=...)), "error" the ExecutionPlanError message and
+// "canonical_error" the code canonical_plan_json refused the plan with. The cases cover what
+// the golden corpus cannot: alternatives, floats, unplaced items, injected orders, integers
+// past int64 and 2^53, keys outside the Basic Multilingual Plane and the characters a JSON
+// writer may treat specially.
 func TestReferenceCases(t *testing.T) {
 	data, err := ioutil.ReadFile("testdata/reference-cases.json")
 	if err != nil {
@@ -45,6 +47,12 @@ func TestReferenceCases(t *testing.T) {
 				t.Fatal(err)
 			}
 			canonical, err := CanonicalPlanJSON(plan)
+			if code, refused := testCase["canonical_error"].(string); refused {
+				if typed, ok := err.(*PlanError); !ok || typed.Code != code {
+					t.Fatalf("got %v (%T), want a PlanError with code %s", err, err, code)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatal(err)
 			}

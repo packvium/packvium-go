@@ -2,6 +2,7 @@ package pareto
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -285,5 +286,44 @@ func TestNoWinnerAlongsideAFrontierOfTwoIsWellFormed(t *testing.T) {
 	made, err := NewProfileReport("fast", []string{"php", "python"}, nil, "")
 	if err != nil || made.Winner() != "" {
 		t.Fatalf("%v %v", made, err)
+	}
+}
+
+// The two-axis sweep must name exactly the engines the pairwise comparison names, ties,
+// duplicates, infinities and both directions included.
+func TestTheTwoAxisSweepAgreesWithThePairwiseFrontier(t *testing.T) {
+	state := uint32(7)
+	next := func(span uint32) float64 {
+		state = state*1664525 + 1013904223
+		return float64(state>>16%span) - float64(span/2)
+	}
+	values := []float64{math.Inf(1), math.Inf(-1), 0, math.Copysign(0, -1)}
+	for round := 0; round < 400; round++ {
+		higherIsBetter := map[string]bool{"a": round%2 == 0, "b": round%3 == 0}
+		count := 2 + round%9
+		candidates := make([]CandidateResult, count)
+		for index := range candidates {
+			a, b := next(5), next(5)
+			if round%7 == 0 {
+				a = values[index%len(values)]
+			}
+			metrics := map[string]float64{"a": a, "b": b, "unused": next(3)}
+			candidate, err := NewCandidateResult("balanced", fmt.Sprintf("engine-%02d", index), metrics)
+			if err != nil {
+				t.Fatal(err)
+			}
+			candidates[index] = candidate
+		}
+		swept, sweptDominated, err := frontier(candidates, higherIsBetter)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pairwise, pairwiseDominated, err := pairwiseFrontier(candidates, higherIsBetter)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(swept, pairwise) || !reflect.DeepEqual(sweptDominated, pairwiseDominated) {
+			t.Fatalf("round %d: sweep %v / %v, pairwise %v / %v", round, swept, sweptDominated, pairwise, pairwiseDominated)
+		}
 	}
 }

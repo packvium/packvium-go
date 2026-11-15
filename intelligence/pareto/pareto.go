@@ -220,8 +220,101 @@ func listRepr(words []string) string {
 }
 
 // frontier splits one profile's candidates into the non-dominated and the dominated engines,
-// each sorted. O(c^2 · axes) for c candidates, the size of one profile.
+// each sorted. With two axes it is a sort and one sweep, O(c log c) for c candidates, the
+// size of one profile; otherwise O(c^2 · axes). Candidates the comparison would refuse (a
+// missing axis, a NaN metric) take the pairwise path, so the error is the one Dominates
+// reports, in the same order.
 func frontier(candidates []CandidateResult, higherIsBetter map[string]bool) ([]string, []string, error) {
+	if len(higherIsBetter) != 2 || len(candidates) < 2 || !comparable(candidates, higherIsBetter) {
+		return pairwiseFrontier(candidates, higherIsBetter)
+	}
+	optimal := twoAxisFrontier(orientedVectors(candidates, higherIsBetter))
+	var onFrontier, dominated []string
+	for index, candidate := range candidates {
+		if optimal[index] {
+			onFrontier = append(onFrontier, candidate.engine)
+		} else {
+			dominated = append(dominated, candidate.engine)
+		}
+	}
+	sort.Strings(onFrontier)
+	sort.Strings(dominated)
+	return onFrontier, dominated, nil
+}
+
+// comparable is whether every candidate has every axis and no NaN metric, so Dominates
+// would refuse none of the pairs.
+func comparable(candidates []CandidateResult, higherIsBetter map[string]bool) bool {
+	for _, candidate := range candidates {
+		for axis := range higherIsBetter {
+			if _, present := candidate.metrics[axis]; !present {
+				return false
+			}
+		}
+		for _, value := range candidate.metrics {
+			if math.IsNaN(value) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// orientedVectors are the candidates' metrics on the axes in name order, negated where
+// higher is better, so smaller is better on every axis.
+func orientedVectors(candidates []CandidateResult, higherIsBetter map[string]bool) [][2]float64 {
+	axes := make([]string, 0, len(higherIsBetter))
+	for axis := range higherIsBetter {
+		axes = append(axes, axis)
+	}
+	sort.Strings(axes)
+	vectors := make([][2]float64, len(candidates))
+	for index, candidate := range candidates {
+		for position, axis := range axes {
+			value := candidate.metrics[axis]
+			if higherIsBetter[axis] {
+				value = -value
+			}
+			vectors[index][position] = value
+		}
+	}
+	return vectors
+}
+
+// twoAxisFrontier is the set of vectors no other vector is at least as small as on both axes
+// and smaller on one. Sorted by (x, y), a vector survives when its y is below every y seen at
+// a smaller x; within one x only the smallest y survives, and equal vectors survive together.
+func twoAxisFrontier(vectors [][2]float64) map[int]bool {
+	ordered := make([]int, len(vectors))
+	for index := range ordered {
+		ordered[index] = index
+	}
+	sort.SliceStable(ordered, func(a, b int) bool {
+		left, right := vectors[ordered[a]], vectors[ordered[b]]
+		return left[0] < right[0] || (left[0] == right[0] && left[1] < right[1])
+	})
+	optimal := map[int]bool{}
+	bestY, seen := 0.0, false
+	for position := 0; position < len(ordered); {
+		x, y := vectors[ordered[position]][0], vectors[ordered[position]][1]
+		survives := !seen || y < bestY
+		end := position
+		for ; end < len(ordered) && vectors[ordered[end]][0] == x; end++ {
+			if survives && vectors[ordered[end]][1] == y {
+				optimal[ordered[end]] = true
+			}
+		}
+		if survives {
+			bestY, seen = y, true
+		}
+		position = end
+	}
+	return optimal
+}
+
+// pairwiseFrontier compares every candidate with every other through Dominates.
+// O(c^2 · axes).
+func pairwiseFrontier(candidates []CandidateResult, higherIsBetter map[string]bool) ([]string, []string, error) {
 	var optimal, dominated []string
 	for index, candidate := range candidates {
 		isDominated := false

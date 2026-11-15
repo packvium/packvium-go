@@ -4,6 +4,39 @@ What changed in the Go module `github.com/packvium/packvium-go`, release by rele
 format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0]
+
+Answers every request the way Packvium 1.3.0 does in the other languages, checked byte for
+byte against the 1.3.0 conformance corpus: 398 packing fixtures, 6 refusal cases, 55
+commerce cases, the execution plan of every golden result and 419 operational-artifact
+cases. Packing results and the plan of every golden result are unchanged from 1.2.0.
+
+### Added
+
+- **Operational artifacts.** Package `artifacts` builds `packvium-operational-artifact/v1`
+  from a request, a validated result and optional loading orders (`artifacts.Build`, or
+  `artifacts.FromJSON` from JSON text): the execution plan unchanged, container and box
+  sizes as tick strings, the result's rendered values for a work order, and provenance --
+  the request itself, the catalogs, the deterministic part of `result.algorithm` and whether
+  a replay is guaranteed to be exact. `artifacts.ExportJSON` (RFC 8785),
+  `artifacts.ExportCSV` (RFC 4180) and `artifacts.ExportWorkOrderHTML` (one self-contained
+  page to print) are byte-identical to the other engines' exports. A refusal is an
+  `*artifacts.Error` with a code from the closed set every engine shares. Like the plan, the
+  package calls no solver, validator, renderer or clock.
+- `examples/artifacts`, and `cmd/packvium-artifact-probe`, the batch probe the suite's
+  artifact conformance run drives.
+
+### Changed
+
+- `execution.CanonicalPlanJSON` writes RFC 8785 canonical JSON, the form the artifact uses:
+  keys in UTF-16 order, numbers as JavaScript writes them (`1.0` is `1`), U+2028 unescaped.
+  The bytes of every plan an engine emits are unchanged; a plan carrying a number beyond
+  2^53 - 1 or a string that is not UTF-8 is now refused with a `*execution.PlanError` whose
+  new `Code` field names the rule.
+- A pinned catalog, tariff or policy-rule version is found by its position instead of a scan
+  of the history, and a two-axis Pareto report sorts once instead of comparing every pair of
+  candidates. Answers are unchanged.
+
 ## [1.2.0]
 
 Answers every request the way Packvium 1.2.0 does in the other languages, checked byte for

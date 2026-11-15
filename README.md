@@ -8,9 +8,9 @@ over another one. It accepts the same requests and returns the same results as t
 PHP, Java and .NET engines. Its tests run the shared conformance corpus, and every result
 matches the reference result byte for byte.
 
-> **Version 1.2.0.** This release corresponds to Packvium 1.2.0 in the other languages, and
-> its tests run the 1.2.0 conformance corpus: every packing fixture, every commerce case and
-> the execution plan of every golden result. Field names, status codes and the objective
+> **Version 1.3.0.** This release corresponds to Packvium 1.3.0 in the other languages, and
+> its tests run the 1.3.0 conformance corpus: every packing fixture, every commerce case, the
+> execution plan of every golden result and its operational artifact. Field names, status codes and the objective
 > vector stay the same for all of 1.x.
 
 ## Contents
@@ -23,6 +23,7 @@ matches the reference result byte for byte.
 - [Commerce](#commerce)
 - [Execution plans](#execution-plans)
 - [Operator locks](#operator-locks)
+- [Operational artifacts](#operational-artifacts)
 - [Scenarios, recommendations and holdout replay](#scenarios-recommendations-and-holdout-replay)
 - [Examples](#examples)
 - [Command line](#command-line)
@@ -34,7 +35,7 @@ matches the reference result byte for byte.
 ## Install
 
 ```bash
-go get github.com/packvium/packvium-go@v1.2.0
+go get github.com/packvium/packvium-go@v1.3.0
 ```
 
 Go 1.13 or newer. The module is checked on a real Go 1.13 toolchain, so projects that
@@ -232,7 +233,8 @@ Without a loading order the plan says `"order": "unavailable"` rather than prese
 solver's search order as a safe one; with one, which must be a permutation of the
 container's placements, each step is numbered. The package imports no solver, no validator
 and no clock, and `CanonicalPlanJSON` is byte-identical to the other engines' plan of the
-same result. [`examples/execution`](examples/execution) prints a whole plan.
+same result. Since 1.3.0 that form is RFC 8785, the canonical JSON the operational artifact
+uses. [`examples/execution`](examples/execution) prints a whole plan.
 
 ## Operator locks
 
@@ -260,6 +262,38 @@ space, or an item type the request does not contain) is a `*locks.LockSetError`,
 before any solve. The third argument keeps your own extensions; the request's `policy` rules
 still apply. `locks.NewPlacementLock(containerIndex, itemType, orientation, position)` builds
 a lock by hand.
+
+## Operational artifacts
+
+A warehouse or transport system that receives a plan still cannot draw it, print it or say
+where it came from without calling the engine again. Package `artifacts` builds the one
+document that can: the plan unchanged, the container and box sizes in ticks, the result's
+rendered values for a work order, and provenance -- the request itself, the catalogs, the
+deterministic part of `result.algorithm` and whether a replay is guaranteed to be exact.
+
+```go
+// order is a loading order from sequence.SafeLoadingOrder, as examples/artifacts computes it.
+artifact, err := artifacts.Build(request, result, map[int][]int{0: order})
+fmt.Println(artifact["format"]) // packvium-operational-artifact/v1
+
+canonical, err := artifacts.ExportJSON(artifact)     // RFC 8785, the bytes every engine emits
+csv, err := artifacts.ExportCSV(artifact)            // RFC 4180, one row per step and unplaced item
+html, err := artifacts.ExportWorkOrderHTML(artifact) // a self-contained page to print
+
+if _, err := artifacts.ExportCSV(map[string]interface{}{"format": "v2"}); err != nil {
+	fmt.Println(err.(*artifacts.Error).Code) // unknown_format
+}
+```
+
+A refusal is an `*artifacts.Error` whose `Code` is one of a closed set every engine shares:
+`invalid_request`, `invalid_result`, `invalid_plan_input`, `mixed_units`,
+`number_out_of_range`, `invalid_string`, `invalid_value`, `unknown_format` and
+`invalid_json`. Numbers beyond 2^53 - 1 are refused, because JavaScript would already hold
+a different one. `artifacts.Parse` and `artifacts.FromJSON` read JSON text with integers kept
+exact; decode with them rather than with `encoding/json` alone, which turns an escaped lone
+surrogate (`"\ud800"`) into U+FFFD where the other engines refuse it. Exports read the
+artifact through its canonical bytes, so a `float64` `1.0` prints as the `1` every other
+engine reads back. [`examples/artifacts`](examples/artifacts) builds and exports one.
 
 ## Scenarios, recommendations and holdout replay
 
@@ -327,6 +361,7 @@ where Python names its own; `go test ./examples/` checks that, line by line.
 | [`nested`](examples/nested) | Units go into cartons and cartons go onto a pallet, in one call. | `go run ./examples/nested` |
 | [`extensions`](examples/extensions) | Custom placement rules, item orders and candidate scorers plugged into the solver. | `go run ./examples/extensions` |
 | [`commerce`](examples/commerce) | Rate a shipment, apply an eligibility rule and pin a catalog version. | `go run ./examples/commerce` |
+| [`artifacts`](examples/artifacts) | Hand a result to a warehouse system: one document with geometry and provenance, a CSV, a printable work order. | `go run ./examples/artifacts` |
 | [`execution`](examples/execution) | Turn a result into a work order, then pin a box with an operator lock and see both ways a lock can fail. | `go run ./examples/execution` |
 | [`intelligence`](examples/intelligence) | Compare two carton sets order by order, propose the change, and replay it against history it has not seen. | `go run ./examples/intelligence` |
 
@@ -381,8 +416,8 @@ shows up in the conformance corpus:
 
 ## Versions and milestones
 
-The module's versions follow the Packvium releases: 1.2.0 here answers every request the way
-Packvium 1.2.0 does in the other languages. Within 1.x, field names, status codes and the
+The module's versions follow the Packvium releases: 1.3.0 here answers every request the way
+Packvium 1.3.0 does in the other languages. Within 1.x, field names, status codes and the
 objective vector do not change. What each release added is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Testing

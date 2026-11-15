@@ -43,7 +43,7 @@ func sceneRef() string {
 	if ref := os.Getenv("PACKVIUM_CONFORMANCE_REF"); ref != "" {
 		return ref
 	}
-	return "v1.2.0"
+	return "v1.3.0"
 }
 
 // TestMatchesTheSharedBoundCorpus recomputes the vectors the reference wrote at the tag. It

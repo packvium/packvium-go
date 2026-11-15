@@ -280,10 +280,9 @@ func (registry *PolicyRegistry) version(ruleID string, number *big.Int) (*Policy
 	if history == nil {
 		return nil, &ruleNotFound{ruleID: ruleID}
 	}
-	for _, rule := range history.versions {
-		if number.Cmp(big.NewInt(int64(rule.Version))) == 0 {
-			return rule, nil
-		}
+	// A rule version's number is its 1-based position (publish only appends). O(1).
+	if position, ok := pinnedPosition(number, len(history.versions)); ok {
+		return history.versions[position], nil
 	}
 	return nil, &ruleVersionNotFound{ruleID: ruleID, version: number}
 }

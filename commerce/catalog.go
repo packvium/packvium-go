@@ -323,13 +323,22 @@ var (
 	errAmbiguousCatalogReference = errors.New("ambiguous catalog reference")
 )
 
+// numbered resolves a pinned version. A version's number is its 1-based position (publish
+// and rollback only append), so the pin is an index. O(1).
 func (registry *CatalogRegistry) numbered(number *big.Int) (*CatalogVersion, error) {
-	for _, version := range registry.versions {
-		if number.Cmp(big.NewInt(int64(version.Number))) == 0 {
-			return version, nil
-		}
+	if position, ok := pinnedPosition(number, len(registry.versions)); ok {
+		return registry.versions[position], nil
 	}
 	return nil, errCatalogVersionNotFound
+}
+
+// pinnedPosition is the slice index of version number in a history of count versions
+// numbered 1..count, and whether there is one.
+func pinnedPosition(number *big.Int, count int) (int, bool) {
+	if !number.IsInt64() || number.Int64() < 1 || number.Int64() > int64(count) {
+		return 0, false
+	}
+	return int(number.Int64()) - 1, true
 }
 
 // resolve pins a version by number, by the version effective at asOf (ties to the

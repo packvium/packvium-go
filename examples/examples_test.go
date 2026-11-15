@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// The Python examples' output at v1.2.0, kept beside the programs so the test runs wherever
+// The Python examples' output at v1.3.0, kept beside the programs so the test runs wherever
 // the module does, with no checkout of the suite repository.
 const referenceDirectory = "testdata"
 
@@ -24,6 +24,9 @@ const referenceDirectory = "testdata"
 // naming its language, with the reference line it stands for. Everything else must match
 // exactly; a listed line that is no longer printed fails the test as stale.
 var languageWording = map[string]map[string]string{
+	"artifacts": {
+		"  contains a script or an external resource: false": "  contains a script or an external resource: False",
+	},
 	"basic": {
 		"the full result as a plain map is what examples/serialization explores:": "the full result as a plain dict is what serialization.py explores:",
 	},

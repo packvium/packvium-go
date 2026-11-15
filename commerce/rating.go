@@ -281,16 +281,15 @@ func (registry *CarrierRegistry) history(carrierID, serviceID string) ([]*Tariff
 	return history, nil
 }
 
-// tariff resolves one pinned version. O(h) in the history length.
+// tariff resolves one pinned version. A version's number is its 1-based position in the
+// history (publish only appends), so the pin is an index. O(1).
 func (registry *CarrierRegistry) tariff(carrierID, serviceID string, version *big.Int) (*Tariff, error) {
 	history, err := registry.history(carrierID, serviceID)
 	if err != nil {
 		return nil, err
 	}
-	for _, candidate := range history {
-		if version.Cmp(big.NewInt(int64(candidate.Version))) == 0 {
-			return candidate, nil
-		}
+	if position, ok := pinnedPosition(version, len(history)); ok {
+		return history[position], nil
 	}
 	return nil, errTariffNotFound
 }

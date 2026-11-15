@@ -1,0 +1,44 @@
+
+==============================================================================
+1. One document that carries everything a consumer needs
+==============================================================================
+  format:          packvium-operational-artifact/v1
+  plan steps:      4
+  crate inside:    12800000 ticks long
+  replay:          exact
+  sales order:     SO-1042
+
+  The request is inside the artifact, not a hash of it: a digest names a request,
+  and only the request itself lets someone replay the artifact without a lookup.
+  `replay` is `exact` because the search finished inside its fuse; a search the
+  clock stopped would say `not_guaranteed` and name the field that decided it.
+
+==============================================================================
+2. A CSV a warehouse system can import
+==============================================================================
+  record,container_index,container_type,sequence,item_type,orientation,x_ticks,y_ticks,z_ticks,x,y,z,length,width,height,length_unit,reason,proof_level
+  step,0,crate,1,printer,LWH,4800000,0,0,300,0,0,420,300,250,mm,,
+  step,0,crate,2,toner,LWH,4800000,4800000,0,300,300,0,300,100,100,mm,,
+
+  One row per step, in the plan's order, then one row per item that was not
+  packed. The tick columns are the identifiers a system matches on; the rendered
+  columns are for people. Nothing is re-rendered: every value is the result's own.
+
+==============================================================================
+3. A work order to print
+==============================================================================
+  1977 bytes of HTML, one section per container, one checkbox per step
+  contains a script or an external resource: False
+
+  Self-contained on purpose: a work order that loads a stylesheet from the network
+  is a work order that prints blank on a dock with no signal.
+
+==============================================================================
+4. The same bytes in every engine, and a refusal instead of a guess
+==============================================================================
+  canonical JSON: 4239 bytes, starting {"format":"packvium-operational-artifact...
+  a v2 document: refused with unknown_format
+
+  The canonical form is RFC 8785, so PHP, Rust and JavaScript build these exact
+  bytes from the same request and result. A reader that meets a format it does not
+  know refuses it by name rather than drawing half of it.
