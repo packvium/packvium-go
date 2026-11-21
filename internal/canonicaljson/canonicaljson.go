@@ -344,3 +344,47 @@ func escapedUnit(text []byte, start int) (uint64, bool) {
 	unit, err := strconv.ParseUint(string(text[start+2:start+6]), 16, 16)
 	return unit, err == nil
 }
+
+// Integer is the integer a decoded JSON value is, judged by value as every engine can judge
+// it. 1.0 is 1, because JavaScript cannot tell them apart once the text is parsed; true, "1"
+// and 1.5 are not integers, and neither is anything past 2^53 - 1, which JavaScript no longer
+// holds exactly.
+func Integer(value interface{}) (int64, bool) {
+	switch typed := value.(type) {
+	case int:
+		return exactInteger(int64(typed))
+	case int64:
+		return exactInteger(typed)
+	case *big.Int:
+		if !typed.IsInt64() {
+			return 0, false
+		}
+		return exactInteger(typed.Int64())
+	case float64:
+		if typed != math.Trunc(typed) || math.Abs(typed) > MaxExactMagnitude {
+			return 0, false
+		}
+		return int64(typed), true
+	}
+	return 0, false
+}
+
+func exactInteger(value int64) (int64, bool) {
+	if value > MaxExactMagnitude || value < -MaxExactMagnitude {
+		return 0, false
+	}
+	return value, true
+}
+
+// Spelling is how a refusal quotes a value: its canonical JSON, the one spelling every engine
+// shares, or a fixed phrase for a value that has none.
+func Spelling(value interface{}) string {
+	text, err := Marshal(value)
+	if err == nil {
+		return text
+	}
+	if refusal, ok := err.(*Error); ok && refusal.Code == CodeNumberOutOfRange {
+		return "an out-of-range number"
+	}
+	return "an unspellable value"
+}

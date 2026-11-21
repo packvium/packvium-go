@@ -8,10 +8,11 @@ over another one. It accepts the same requests and returns the same results as t
 PHP, Java and .NET engines. Its tests run the shared conformance corpus, and every result
 matches the reference result byte for byte.
 
-> **Version 1.3.0.** This release corresponds to Packvium 1.3.0 in the other languages, and
-> its tests run the 1.3.0 conformance corpus: every packing fixture, every commerce case, the
-> execution plan of every golden result and its operational artifact. Field names, status codes and the objective
-> vector stay the same for all of 1.x.
+> **Version 1.4.0.** This release corresponds to Packvium 1.4.0 in the other languages, and
+> its tests run the 1.4.0 conformance corpus: every packing fixture, every commerce case, the
+> execution plan of every golden result and its operational artifact, every structured request
+> error and every plan-revision case. Field names, status codes and the objective vector stay
+> the same for all of 1.x.
 
 ## Contents
 
@@ -24,6 +25,7 @@ matches the reference result byte for byte.
 - [Execution plans](#execution-plans)
 - [Operator locks](#operator-locks)
 - [Operational artifacts](#operational-artifacts)
+- [Fixed placements and plan revisions](#fixed-placements-and-plan-revisions)
 - [Scenarios, recommendations and holdout replay](#scenarios-recommendations-and-holdout-replay)
 - [Examples](#examples)
 - [Command line](#command-line)
@@ -35,7 +37,7 @@ matches the reference result byte for byte.
 ## Install
 
 ```bash
-go get github.com/packvium/packvium-go@v1.3.0
+go get github.com/packvium/packvium-go@v1.4.0
 ```
 
 Go 1.13 or newer. The module is checked on a real Go 1.13 toolchain, so projects that
@@ -139,6 +141,20 @@ if err != nil {
 	log.Fatal(err) // a malformed request, refused with a message naming the problem
 }
 fmt.Println(result["status"]) // feasible
+```
+
+A request no engine may answer is refused with a `*domain.InvalidRequestError` that names
+the bad value: `Code` is `invalid_request`, `Reason` one of a closed set (`missing_field`,
+`wrong_type`, `below_minimum`, `above_maximum`, `negative_measure`, `invalid_unit`,
+`duplicate_id`, `not_allowed`, `invalid_value`), `Field` the RFC 6901 pointer of the value,
+and the message is the one every engine writes, such as
+`invalid_request: /items/0/quantity: must be at least 1`. Every number below the minimum the
+request schema gives it, and every negative length or weight, is refused this way.
+
+```go
+if refusal, ok := err.(*domain.InvalidRequestError); ok {
+	fmt.Println(refusal.Reason, refusal.Field) // below_minimum /items/0/quantity
+}
 ```
 
 A request that sets a field no engine implements yet (`container.pallet_overhang_limit`) is
@@ -295,6 +311,40 @@ surrogate (`"\ud800"`) into U+FFFD where the other engines refuse it. Exports re
 artifact through its canonical bytes, so a `float64` `1.0` prints as the `1` every other
 engine reads back. [`examples/artifacts`](examples/artifacts) builds and exports one.
 
+## Fixed placements and plan revisions
+
+A request's `fixed_placements` pins items that are already loaded, or locked in place,
+before the solve: item type, container type and instance, the physical origin a result
+reports, and an orientation. Fixed items take the first instances of their type, their
+containers open first and are always kept, and the solve packs around them with their weight,
+support and top load counted. They come back marked `"fixed": true`, and the independent
+validator refuses an answer that drops, moves or invents one. A fixed set that is not a valid
+packing on its own is refused before any search with a `*domain.InvalidRequestError` whose
+`Code` is `invalid_fixed_placement`, reason `malformed` for an entry that is not the schema's
+shape (nothing is coerced) or `cannot_hold`. With domain objects the same is
+`packer.New(cfg, nil).PackWithFixedPlacements(items, containers, fixed)`.
+
+Package `revisions` records what changed against an approved plan as
+`packvium-plan-revision/v1`, an append-only chain: each revision names its parent and the
+artifact it replaced by SHA-256 over RFC 8785 bytes, records the events observed against
+that artifact (`item_missing`, `container_substituted`, `placement_locked`,
+`placement_verified`) and carries the request they produce. The replan is an ordinary solve of
+that request; locks and verified placements become fixed placements.
+
+```go
+root, err := revisions.RootRevision(request)
+next, err := revisions.DeriveRevision(root, approvedArtifact, events)
+issues, err := revisions.VerifyRevisionChain([]interface{}{root, next}, []interface{}{nil, approvedArtifact})
+digest, err := revisions.DocumentDigest(next) // "sha256:..."
+```
+
+A refusal is a `*revisions.Error` with a code every engine shares (`invalid_revision`,
+`invalid_event`, `event_conflict`, `invalid_artifact`, or a canonical-form code). The
+package calls no solver, validator or clock. `intelligence/revisionoutcomes` turns a
+revision's events into outcome-ledger events, so what happened on the dock becomes evidence
+for the historical evaluation. [`examples/revisions`](examples/revisions) replans a
+half-loaded job.
+
 ## Scenarios, recommendations and holdout replay
 
 The packages under `intelligence/` answer the question that comes after packing well: is a
@@ -363,6 +413,7 @@ where Python names its own; `go test ./examples/` checks that, line by line.
 | [`commerce`](examples/commerce) | Rate a shipment, apply an eligibility rule and pin a catalog version. | `go run ./examples/commerce` |
 | [`artifacts`](examples/artifacts) | Hand a result to a warehouse system: one document with geometry and provenance, a CSV, a printable work order. | `go run ./examples/artifacts` |
 | [`execution`](examples/execution) | Turn a result into a work order, then pin a box with an operator lock and see both ways a lock can fail. | `go run ./examples/execution` |
+| [`revisions`](examples/revisions) | Replan a half-loaded job: keep a loaded box where it is, record a missing item against the approved plan, and audit the chain. | `go run ./examples/revisions` |
 | [`intelligence`](examples/intelligence) | Compare two carton sets order by order, propose the change, and replay it against history it has not seen. | `go run ./examples/intelligence` |
 
 Run them from the module root.
@@ -416,8 +467,8 @@ shows up in the conformance corpus:
 
 ## Versions and milestones
 
-The module's versions follow the Packvium releases: 1.3.0 here answers every request the way
-Packvium 1.3.0 does in the other languages. Within 1.x, field names, status codes and the
+The module's versions follow the Packvium releases: 1.4.0 here answers every request the way
+Packvium 1.4.0 does in the other languages. Within 1.x, field names, status codes and the
 objective vector do not change. What each release added is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Testing

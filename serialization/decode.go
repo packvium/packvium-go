@@ -11,6 +11,7 @@ import (
 	"github.com/packvium/packvium-go/config"
 	"github.com/packvium/packvium-go/domain"
 	"github.com/packvium/packvium-go/hull"
+	policyModule "github.com/packvium/packvium-go/policy"
 	"github.com/packvium/packvium-go/units"
 )
 
@@ -25,24 +26,54 @@ type DecodedRequest struct {
 	OutputWeightUnit    string
 	CatalogVersionsUsed []interface{}
 	Policy              interface{}
+	FixedPlacements     []domain.FixedPlacement
+	// rules is Policy compiled while decoding; nil for a request built by hand.
+	rules *policyModule.PolicyRuleSet
 }
 
 // Decode reads a wire request in the reference's order, so a malformed request earns the
-// same first refusal it does there.
+// same first refusal it does there. A request no engine may answer is refused with a
+// *domain.InvalidRequestError naming the bad value (docs/ERRORS.md); a refusal the rule table
+// does not name still reaches the caller as one, with reason "invalid_value".
 func Decode(raw interface{}) (*DecodedRequest, error) {
 	request, ok := raw.(map[string]interface{})
 	if !ok {
-		return nil, errors.New("request must be an object")
+		return nil, domain.NewInvalidRequestError("wrong_type", "", "must be an object")
 	}
 	if err := RejectUnsupported(request, CurrentlyUnsupported); err != nil {
 		return nil, err
 	}
+	if err := checkRequest(request); err != nil {
+		return nil, err
+	}
+	decoded, err := decodeChecked(request)
+	return decoded, asRequestError(err)
+}
+
+// asRequestError is err as a request refusal. Only turning JSON into the model goes through
+// it, never the solve, so a solver defect is never dressed up as the caller's mistake.
+func asRequestError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, structured := err.(*domain.InvalidRequestError); structured {
+		return err
+	}
+	return domain.NewInvalidRequestError("invalid_value", "", err.Error())
+}
+
+func decodeChecked(request map[string]interface{}) (*DecodedRequest, error) {
 	fields := object(request)
 	unitsBlock, err := child(fields, "units")
 	if err != nil {
 		return nil, err
 	}
 	unit := unitsBlock.text("length", "mm")
+	if length, present := unitsBlock["length"]; present && length == nil {
+		// The reference reads a null unit as a value and fails on it; this is the refusal the
+		// other ports give.
+		return nil, errors.New("unsupported length unit: None")
+	}
 	configuration, err := child(fields, "configuration")
 	if err != nil {
 		return nil, err
@@ -56,6 +87,12 @@ func Decode(raw interface{}) (*DecodedRequest, error) {
 		return nil, err
 	}
 	policy, _ := fields.get("policy")
+	// Parsed here, after the catalog references and before any item, because that is where
+	// the reference compiles it, so a request broken in both places is refused for the policy.
+	rules, err := policyModule.ParseRuleSet(policy)
+	if err != nil {
+		return nil, err
+	}
 	items, err := decodeAll(fields, "items")
 	if err != nil {
 		return nil, err
@@ -80,6 +117,10 @@ func Decode(raw interface{}) (*DecodedRequest, error) {
 		}
 		decodedContainers = append(decodedContainers, container)
 	}
+	fixed, err := decodeFixedPlacements(request["fixed_placements"], unit)
+	if err != nil {
+		return nil, err
+	}
 	output, err := child(fields, "output")
 	if err != nil {
 		return nil, err
@@ -87,7 +128,7 @@ func Decode(raw interface{}) (*DecodedRequest, error) {
 	return &DecodedRequest{
 		Config: packingConfig, Items: decodedItems, Containers: decodedContainers,
 		OutputLengthUnit: output.text("length_unit", unit), OutputWeightUnit: output.text("weight_unit", weightUnit),
-		CatalogVersionsUsed: references, Policy: policy,
+		CatalogVersionsUsed: references, Policy: policy, FixedPlacements: fixed, rules: &rules,
 	}, nil
 }
 
@@ -332,16 +373,16 @@ func decodeItem(raw object, unit string) (*domain.Item, error) {
 		return nil, err
 	}
 	spec.Group = optionalText(raw, "group")
-	if spec.Tags, err = raw.strings("tags"); err != nil {
+	if spec.Tags, err = raw.tagSet("tags"); err != nil {
 		return nil, err
 	}
-	if spec.IncompatibleTags, err = raw.strings("incompatible_tags"); err != nil {
+	if spec.IncompatibleTags, err = raw.tagSet("incompatible_tags"); err != nil {
 		return nil, err
 	}
 	if spec.Priority, err = raw.integer("priority", 0); err != nil {
 		return nil, err
 	}
-	if spec.EligibleContainerTags, err = raw.strings("eligible_container_tags"); err != nil {
+	if spec.EligibleContainerTags, err = raw.tagSet("eligible_container_tags"); err != nil {
 		return nil, err
 	}
 	spec.GroundContactRule = optionalText(raw, "ground_contact_rule")
@@ -438,8 +479,9 @@ func decodeBox(raw object, unit string) (domain.Box, error) {
 	}
 	var coordinates [3]int64
 	for axis, key := range []string{"x", "y", "z"} {
+		// An axis given as null is read as a value, which the reference refuses, not as 0.
 		value := interface{}(int64(0))
-		if given, ok := origin.get(key); ok {
+		if given, ok := origin[key]; ok {
 			value = given
 		}
 		length, err := parseLength(value, unit)
@@ -475,7 +517,8 @@ func decodeObstacles(raw object, unit string) ([]domain.Obstacle, error) {
 		if err != nil {
 			return nil, err
 		}
-		id, ok := entry.get("id")
+		// Present and null is the reference's str(None), not a missing key.
+		id, ok := entry["id"]
 		if !ok {
 			return nil, errors.New("'id'")
 		}
@@ -620,7 +663,7 @@ func decodeContainer(raw object, unit string) (*domain.Container, error) {
 	if spec.Quantity, err = raw.optionalInteger("quantity"); err != nil {
 		return nil, err
 	}
-	if spec.Tags, err = raw.strings("tags"); err != nil {
+	if spec.Tags, err = raw.tagSet("tags"); err != nil {
 		return nil, err
 	}
 	if spec.MaxItems, err = raw.optionalInteger("max_items"); err != nil {
@@ -670,7 +713,7 @@ var catalogReferenceKeys = []string{"catalog_id", "effective_at", "resolved_at",
 // catalogVersionsUsed checks the catalog references a caller echoes into the result: each
 // with exactly the four keys, a non-empty unique id and integer versions and timestamps.
 func catalogVersionsUsed(fields object) ([]interface{}, error) {
-	value, present := fields["catalog_versions_used"]
+	value, present := fields.get("catalog_versions_used")
 	if !present {
 		return []interface{}{}, nil
 	}

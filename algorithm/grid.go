@@ -164,7 +164,7 @@ func (g GridSolver) PackOne(container *domain.Container, sequence int64, items [
 
 func (g GridSolver) mustDelegate(container *domain.Container, items []domain.ItemInstance) bool {
 	// A mixed-type list would place every item with the first item's dimensions.
-	if len(container.Obstacles()) > 0 || len(items) == 0 || !g.Supports(items) {
+	if len(container.Obstacles()) > 0 || container.HasPreloaded() || len(items) == 0 || !g.Supports(items) {
 		return true
 	}
 	prototype := items[0].Item()

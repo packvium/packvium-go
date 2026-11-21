@@ -56,11 +56,21 @@ func PackDecodedWithExtensions(request *DecodedRequest, extensions *algorithm.Ex
 			packed, err = nil, fmt.Errorf("%v", recovered)
 		}
 	}()
-	rules, err := policy.ParseRuleSet(request.Policy)
+	rules, err := compiledPolicy(request)
 	if err != nil {
-		return nil, err
+		return nil, asRequestError(err)
 	}
-	return packer.New(request.Config, withPolicy(rules, extensions)).Pack(request.Items, request.Containers)
+	return packer.New(request.Config, withPolicy(rules, extensions)).PackWithFixedPlacements(request.Items,
+		request.Containers, request.FixedPlacements)
+}
+
+// compiledPolicy is the rule set Decode compiled, or the request's policy compiled now when
+// the request was built by hand.
+func compiledPolicy(request *DecodedRequest) (policy.PolicyRuleSet, error) {
+	if request.rules != nil {
+		return *request.rules, nil
+	}
+	return policy.ParseRuleSet(request.Policy)
 }
 
 // withPolicy is the caller's registry with the policy constraints first and every other

@@ -44,13 +44,27 @@ func (e *UnratedWeightError) Error() string { return e.Message }
 
 // Pack solves the request. A malformed request, an unpriceable objective or answer, and an
 // arithmetic overflow are returned as errors, never panics.
-func (p *Packer) Pack(items []*domain.Item, containers []*domain.Container) (packed *result.PackingResult, err error) {
+func (p *Packer) Pack(items []*domain.Item, containers []*domain.Container) (*result.PackingResult, error) {
+	return p.PackWithFixedPlacements(items, containers, nil)
+}
+
+// PackWithFixedPlacements is Pack with items pinned before the solve. Fixed items take the
+// first instances of their type, their containers open first and are always kept, and the
+// solve packs around them. A fixed set that is not a valid packing on its own is refused with
+// a *domain.InvalidRequestError whose Code is "invalid_fixed_placement".
+func (p *Packer) PackWithFixedPlacements(items []*domain.Item, containers []*domain.Container,
+	fixed []domain.FixedPlacement) (packed *result.PackingResult, err error) {
 	defer algorithm.RecoverRefusal(&err)
 	request, err := domain.NewPackingRequest(items, containers)
 	if err != nil {
 		return nil, err
 	}
+	request = request.WithFixedPlacements(fixed)
 	if err := p.refuseUnpriceableObjectives(request); err != nil {
+		return nil, err
+	}
+	load, err := admitFixedPlacements(request, p.cfg.MinimumSupportRatio(), p.cfg.Clearance(), p.cfg.MaxContainers())
+	if err != nil {
 		return nil, err
 	}
 	clock := p.clock
@@ -58,8 +72,8 @@ func (p *Packer) Pack(items []*domain.Item, containers []*domain.Container) (pac
 		clock = algorithm.MonotonicClock()
 	}
 	deadline := algorithm.DeadlineWithClock(p.cfg.TimeLimitMS(), clock)
-	portfolio := algorithm.NewSolverOrchestrator(p.extensions).SolvePortfolio(request.Instances(),
-		request.Containers(), p.cfg, deadline)
+	portfolio := algorithm.NewSolverOrchestrator(p.extensions).SolvePortfolioFrom(load.free,
+		request.Containers(), p.cfg, deadline, load.containers)
 	scorer := p.scorer
 	if scorer == nil {
 		scorer = algorithm.ResolveObjective(p.cfg.Objective(), p.cfg)

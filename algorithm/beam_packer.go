@@ -34,7 +34,7 @@ func BeamPack(container *domain.Container, sequence int64, items []domain.ItemIn
 	incumbent := greedyRollout(container, sequence, batches, cfg, constraints, stats, deadline, scorer)
 	// nodeKey builds an O(m) placement signature and a knapsack bound; computing it once per
 	// node instead of once per comparison changes no ordering.
-	incumbentKey := nodeKey(incumbent, nil)
+	incumbentKey := nodeKey(incumbent, futureCosts{})
 	for position, batch := range batches {
 		var expansions []beamNode
 		exhausted := false
@@ -58,29 +58,33 @@ func BeamPack(container *domain.Container, sequence int64, items []domain.ItemIn
 		}
 		future := Flatten(batches[position+1:])
 		for _, expansion := range expansions {
-			candidate := beamNode{expansion.state, concatInstances(expansion.unplaced, future)}
-			if candidateKey := nodeKey(candidate, nil); candidateKey.Compare(incumbentKey) < 0 {
-				incumbent, incumbentKey = candidate, candidateKey
+			// The key of the expansion with every later batch left unplaced, built without the
+			// concatenation unless it wins.
+			unplaced := int64(len(expansion.unplaced) + len(future))
+			candidateKey := stateKey(expansion.state, unplaced, unplaced)
+			if candidateKey.Compare(incumbentKey) < 0 {
+				incumbent = beamNode{expansion.state, concatInstances(expansion.unplaced, future)}
+				incumbentKey = candidateKey
 			}
 		}
 		if len(expansions) == 0 {
 			break
 		}
-		beam = firstNodes(sortNodes(expansions, future), width)
+		beam = firstNodes(sortNodes(expansions, newFutureCosts(future, container.MaxPayload() != nil)), width)
 		if exhausted {
 			return SingleContainerSolution{State: incumbent.state, Unpacked: incumbent.unplaced,
 				TimeLimitReached: deadline.Expired()}
 		}
 	}
-	ordered := sortNodes(beam, nil)
+	ordered := sortNodes(beam, futureCosts{})
 	chosen := incumbent
-	if len(ordered) > 0 && nodeKey(ordered[0], nil).Compare(incumbentKey) < 0 {
+	if len(ordered) > 0 && nodeKey(ordered[0], futureCosts{}).Compare(incumbentKey) < 0 {
 		chosen = ordered[0]
 	}
 	return plainSolution(chosen.state, chosen.unplaced)
 }
 
-func sortNodes(nodes []beamNode, future []domain.ItemInstance) []beamNode {
+func sortNodes(nodes []beamNode, future futureCosts) []beamNode {
 	order := stableOrder(len(nodes), func(index int) SortKey { return nodeKey(nodes[index], future) })
 	out := make([]beamNode, len(nodes))
 	for position, index := range order {
@@ -145,7 +149,7 @@ func packLegacy(container *domain.Container, sequence int64, items []domain.Item
 				expansions = append(expansions, beamNode{child, node.unplaced})
 			}
 		}
-		beam = firstNodes(sortNodes(expansions, nil), int64(width))
+		beam = firstNodes(sortNodes(expansions, futureCosts{}), int64(width))
 		if exhausted {
 			best := beam[0]
 			pending := Flatten(batches[position+1:])
@@ -196,16 +200,46 @@ func Extended(state *ContainerState, item domain.ItemInstance, candidate Candida
 	return child
 }
 
-// maximumCountByVolume is how many of the cheapest future items could still fit by volume
-// alone. O(f log f).
-func maximumCountByVolume(future []domain.ItemInstance, capacity *big.Int) int64 {
-	costs := make([]*big.Int, len(future))
-	for index, item := range future {
-		costs[index] = item.Item().Dimensions().Volume()
+// futureCosts are the later batches' volumes and weights, each sorted once per beam level
+// rather than once per node: O(f log f) per level instead of O(w f log f). A nil list means
+// that bound does not apply (a nesting item, or no payload limit).
+type futureCosts struct {
+	volumes []*big.Int
+	weights []int64
+	count   int64
+}
+
+func newFutureCosts(future []domain.ItemInstance, payloadLimited bool) futureCosts {
+	if len(future) == 0 {
+		return futureCosts{}
 	}
-	sort.Slice(costs, func(i, j int) bool { return costs[i].Cmp(costs[j]) < 0 })
+	costs := futureCosts{count: int64(len(future))}
+	nesting := false
+	for _, item := range future {
+		nesting = nesting || item.Item().NestingHeight() != nil
+	}
+	if !nesting {
+		costs.volumes = make([]*big.Int, len(future))
+		for index, item := range future {
+			costs.volumes[index] = item.Item().Dimensions().Volume()
+		}
+		sort.Slice(costs.volumes, func(i, j int) bool { return costs.volumes[i].Cmp(costs.volumes[j]) < 0 })
+	}
+	if payloadLimited {
+		costs.weights = make([]int64, len(future))
+		for index, item := range future {
+			costs.weights[index] = item.Item().Weight().Ticks()
+		}
+		sort.Slice(costs.weights, func(i, j int) bool { return costs.weights[i] < costs.weights[j] })
+	}
+	return costs
+}
+
+// countWithinVolume is how many of the cheapest future items could still fit by volume alone,
+// over ascending volumes. O(f).
+func countWithinVolume(sorted []*big.Int, capacity *big.Int) int64 {
 	used, count := new(big.Int), int64(0)
-	for _, cost := range costs {
+	for _, cost := range sorted {
 		next := new(big.Int).Add(used, cost)
 		if next.Cmp(capacity) > 0 {
 			break
@@ -215,42 +249,41 @@ func maximumCountByVolume(future []domain.ItemInstance, capacity *big.Int) int64
 	return count
 }
 
-func unpackedLowerBound(state *ContainerState, unplaced, future []domain.ItemInstance) int64 {
-	if len(future) == 0 {
-		return int64(len(unplaced))
-	}
-	possible := int64(len(future))
-	nesting := false
-	for _, item := range future {
-		nesting = nesting || item.Item().NestingHeight() != nil
-	}
-	if !nesting {
-		capacity := new(big.Int).Sub(state.Container.InnerDimensions().Volume(), state.UsedVolume)
-		possible = ints.Min(possible, maximumCountByVolume(future, capacity))
-	}
-	if payload := state.Container.MaxPayload(); payload != nil {
-		capacity := ints.Max(0, payload.Ticks()-state.PayloadTicks)
-		weights := make([]int64, len(future))
-		for index, item := range future {
-			weights[index] = item.Item().Weight().Ticks()
+func countWithinWeight(sorted []int64, capacity int64) int64 {
+	used, count := int64(0), int64(0)
+	for _, weight := range sorted {
+		if used+weight > capacity {
+			break
 		}
-		sort.Slice(weights, func(i, j int) bool { return weights[i] < weights[j] })
-		used, count := int64(0), int64(0)
-		for _, weight := range weights {
-			if used+weight > capacity {
-				break
-			}
-			used += weight
-			count++
-		}
-		possible = ints.Min(possible, count)
+		used += weight
+		count++
 	}
-	return int64(len(unplaced)) + int64(len(future)) - possible
+	return count
 }
 
-func nodeKey(node beamNode, future []domain.ItemInstance) SortKey {
-	state := node.state
-	return SortKey{Int(unpackedLowerBound(state, node.unplaced, future)), Int(int64(len(node.unplaced))),
-		Int(-int64(len(state.Placements))), Int(state.MaxZ), Big(negated(state.UsedVolume)),
-		Str(state.PlacementSignature())}
+// unpackedLowerBound is an admissible volume and weight bound on the final unpacked count.
+func unpackedLowerBound(state *ContainerState, unplaced int64, future futureCosts) int64 {
+	if future.count == 0 {
+		return unplaced
+	}
+	possible := future.count
+	if future.volumes != nil {
+		capacity := new(big.Int).Sub(state.Container.InnerDimensions().Volume(), state.UsedVolume)
+		possible = ints.Min(possible, countWithinVolume(future.volumes, capacity))
+	}
+	if future.weights != nil {
+		capacity := ints.Max(0, state.Container.MaxPayload().Ticks()-state.PayloadTicks)
+		possible = ints.Min(possible, countWithinWeight(future.weights, capacity))
+	}
+	return unplaced + future.count - possible
+}
+
+func nodeKey(node beamNode, future futureCosts) SortKey {
+	unplaced := int64(len(node.unplaced))
+	return stateKey(node.state, unpackedLowerBound(node.state, unplaced, future), unplaced)
+}
+
+func stateKey(state *ContainerState, bound, unplaced int64) SortKey {
+	return SortKey{Int(bound), Int(unplaced), Int(-int64(len(state.Placements))), Int(state.MaxZ),
+		Big(negated(state.UsedVolume)), Str(state.PlacementSignature())}
 }

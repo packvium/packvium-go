@@ -1,0 +1,43 @@
+
+==============================================================================
+1. The approved plan, and the revision that records it
+==============================================================================
+  revision 0, parent None
+  first step: a cube at x=0 in container 0
+
+  The root records nothing against the request. It exists so the first change has a
+  parent to name.
+
+==============================================================================
+2. What happened on the dock, recorded against that plan
+==============================================================================
+  revision 1, parent sha256:db93f7e11045dfaa...
+  approved artifact sha256:d3d39dff77bb365c..., replay exact
+  slabs still to pack: 1
+  fixed placements:    1
+
+  The events are applied to the request, not to the result: one slab fewer, and the
+  cube becomes a fixed placement. The revision names its parent and the artifact it
+  replaces by SHA-256 over their RFC 8785 bytes, so every engine computes the same
+  digest.
+
+==============================================================================
+3. The replan keeps the cube where it is
+==============================================================================
+  fixed in the answer: cube#1 in tote#1
+  items placed:        5
+
+  An ordinary solve of the derived request, with nothing remembered from the first
+  one. The fixed cube is marked `fixed: true`, and the validator refuses any answer
+  that moves it.
+
+==============================================================================
+4. An audit that notices tampering, and a refusal instead of a guess
+==============================================================================
+  intact chain: no issues
+  edited chain: request_mismatch
+  a pallet that was never requested: refused with event_conflict
+
+  An edited request no longer equals what its parent's request and its own events
+  produce, and any later revision would stop naming it as a parent. An event that
+  contradicts the request is refused by name rather than applied as a best guess.

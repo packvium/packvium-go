@@ -152,6 +152,12 @@ type Container struct {
 	spec          ContainerSpec
 	tags          TagSet
 	tagLimitNames []string
+	// preloaded are items already in this one container instance before search starts. Only
+	// the orchestrator sets them, on the instance a request's fixed placements name, so every
+	// solver's state starts from them without knowing they exist; base is the request's own
+	// container, which a packed result carries instead (docs/PLAN-REVISIONS.md).
+	preloaded []Placement
+	base      *Container
 }
 
 // NewContainer validates a spec in the reference order.
@@ -192,6 +198,9 @@ func validateContainer(spec ContainerSpec) error {
 		if limit < 1 {
 			return errors.New("tag_limits must be at least 1")
 		}
+	}
+	if spec.MaxItems != nil && *spec.MaxItems < 1 {
+		return errors.New("container max_items must be at least 1")
 	}
 	if err := ValidateDirections(spec.AccessDirections); err != nil {
 		return err
@@ -244,6 +253,28 @@ func (c *Container) Axles() *[2]Axle                { return copyAxles(c.spec.Ax
 func (c *Container) AccessDirections() []string {
 	return append([]string(nil), c.spec.AccessDirections...)
 }
+
+// WithPreloaded is this container seeded with placements already inside it. O(p).
+func (c *Container) WithPreloaded(placements []Placement) *Container {
+	seeded := *c
+	seeded.preloaded = append([]Placement(nil), placements...)
+	seeded.base = c.WithoutPreloaded()
+	return &seeded
+}
+
+// WithoutPreloaded is the request's container this one was seeded from, or itself.
+func (c *Container) WithoutPreloaded() *Container {
+	if c.base != nil {
+		return c.base
+	}
+	return c
+}
+
+// Preloaded are the placements the container starts with; empty unless seeded.
+func (c *Container) Preloaded() []Placement { return append([]Placement(nil), c.preloaded...) }
+
+// HasPreloaded reports whether the container starts with placements.
+func (c *Container) HasPreloaded() bool { return len(c.preloaded) > 0 }
 
 // TagLimitNames are the limited tags in ascending order.
 func (c *Container) TagLimitNames() []string { return append([]string(nil), c.tagLimitNames...) }

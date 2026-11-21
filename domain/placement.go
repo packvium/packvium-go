@@ -16,12 +16,22 @@ type Placement struct {
 	envelopeDimensions Dimensions
 	supportRatio       float64
 	topLoad            units.Weight
+	// fixed marks a placement the request's fixed placements made, not search; nothing may
+	// move it.
+	fixed bool
 }
 
 // NewPlacement builds a placement with no load resting on it.
 func NewPlacement(instance ItemInstance, position Point, rotation Rotation, dimensions Dimensions,
 	envelopeOrigin Point, envelopeDimensions Dimensions, supportRatio float64) Placement {
-	return Placement{instance, position, rotation, dimensions, envelopeOrigin, envelopeDimensions, supportRatio, units.Weight{}}
+	return Placement{instance, position, rotation, dimensions, envelopeOrigin, envelopeDimensions, supportRatio,
+		units.Weight{}, false}
+}
+
+// AsFixed is the same placement marked as placed by the request, not by search.
+func (p Placement) AsFixed() Placement {
+	p.fixed = true
+	return p
 }
 
 // WithTopLoad is the same placement carrying the given load.
@@ -44,6 +54,7 @@ func (p Placement) EnvelopeOrigin() Point          { return p.envelopeOrigin }
 func (p Placement) EnvelopeDimensions() Dimensions { return p.envelopeDimensions }
 func (p Placement) SupportRatio() float64          { return p.supportRatio }
 func (p Placement) TopLoad() units.Weight          { return p.topLoad }
+func (p Placement) Fixed() bool                    { return p.fixed }
 func (p Placement) Box() Box                       { return Box{p.position, p.dimensions} }
 func (p Placement) EnvelopeBox() Box               { return Box{p.envelopeOrigin, p.envelopeDimensions} }
 

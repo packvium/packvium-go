@@ -4,6 +4,64 @@ What changed in the Go module `github.com/packvium/packvium-go`, release by rele
 format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0]
+
+Answers every request the way Packvium 1.4.0 does in the other languages, checked byte for
+byte against the 1.4.0 conformance corpus: 400 packing fixtures, 6 refusal cases, 55
+commerce cases, the execution plan of every golden result, 421 operational-artifact cases,
+102 plan-revision cases and 122 malformed requests. Every 1.3.0 golden result keeps its bytes.
+
+### Added
+
+- **Fixed placements.** A request's `fixed_placements` pins items already loaded or locked
+  in place: item type, container type and instance, the physical origin a result reports,
+  and an orientation (`domain.FixedPlacement` and `packer.PackWithFixedPlacements` with
+  domain objects). Fixed items take the first instances of their type, their containers open
+  first and are always kept, and the solve packs around them with their weight, support and
+  top load counted. They come back marked `"fixed": true`. A fixed set that is not a valid
+  packing on its own, or an entry that is not the schema's shape, is refused before any
+  search with `invalid_fixed_placement`; nothing is coerced. The validator refuses an answer
+  that drops, moves or invents a fixed placement.
+- **Plan revisions.** Package `revisions` builds and audits `packvium-plan-revision/v1`, an
+  append-only chain: each revision names its parent and the artifact it replaced by SHA-256
+  over RFC 8785 bytes, records the events observed against that artifact (`item_missing`,
+  `container_substituted`, `placement_locked`, `placement_verified`) and carries the request
+  they produce. `revisions.VerifyRevisionChain` reports a broken parent link, a gap in the
+  event sequence, an edited request and a swapped artifact. It calls no solver, validator or
+  clock.
+- **Revision outcomes.** Package `intelligence/revisionoutcomes` records a revision's events
+  in the outcome ledger, as the new `item_missing` and `placement_verified` event types among
+  others, so what happened on the dock becomes evidence for the historical evaluation.
+- **Structured request errors.** A request no engine may answer is refused with a
+  `*domain.InvalidRequestError`: `Code` `invalid_request` (or `invalid_fixed_placement`), a
+  `Reason` from a closed set, the RFC 6901 pointer of the bad value in `Field`, and the same
+  message as every other engine, such as `invalid_request: /items/0/quantity: must be at least 1`.
+- `examples/revisions`, and `cmd/packvium-revision-probe`, the batch probe the suite's
+  revision and request-error conformance runs drive.
+
+### Changed
+
+- **Container ids number each type from 1 in quality answers.** The container-plan beam
+  numbered containers with one counter across types, so a crate opened before a box made it
+  `box#2`; it is now `box#1`, as in the other engines. Only ids of answers opening more than
+  one container type change; placements, counts and scores do not.
+- An integral float (`100.0`) is accepted as a whole length or weight, as JavaScript cannot
+  send anything else for `100`; a fraction is still refused.
+- The single-container beam sorts the later items' volumes and weights once per level rather
+  than once per candidate. Answers are unchanged.
+
+### Fixed
+
+- A request is read in the reference's order, so one with a malformed policy and a malformed
+  item is refused for the policy. An obstacle origin axis given as `null` is refused rather
+  than read as 0, an obstacle `id` given as `null` is accepted as the other engines accept it,
+  a list or object among an item's or container's tags is refused, and `units.length: null`
+  is refused with `unsupported length unit: None`.
+- **Numbers below their floor are refused.** A negative length or weight, a quantity, limit
+  or ratio below the request schema's minimum, a zero or negative `max_containers`,
+  container `max_items` or effort-budget limit are refused with the field they belong to,
+  where some were answered before.
+
 ## [1.3.0]
 
 Answers every request the way Packvium 1.3.0 does in the other languages, checked byte for

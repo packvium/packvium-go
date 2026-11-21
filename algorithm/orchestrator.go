@@ -43,16 +43,25 @@ func NewSolverOrchestrator(extensions *ExtensionRegistry) *SolverOrchestrator {
 // SolvePortfolio runs every start, capped by the effort budget's restart limit.
 func (o *SolverOrchestrator) SolvePortfolio(items []domain.ItemInstance, containers []*domain.Container,
 	cfg *config.PackingConfig, deadline *Deadline) PortfolioRun {
+	return o.SolvePortfolioFrom(items, containers, cfg, deadline, nil)
+}
+
+// SolvePortfolioFrom is SolvePortfolio continuing from preloaded: the containers a request's
+// fixed placements name, each holding only its fixed items, in the order they open. Every
+// start fills them first and keeps them, whatever else it does.
+func (o *SolverOrchestrator) SolvePortfolioFrom(items []domain.ItemInstance, containers []*domain.Container,
+	cfg *config.PackingConfig, deadline *Deadline, preloaded []*domain.PackedContainer) PortfolioRun {
 	starts := o.starts(items, cfg)
 	budget := cfg.EffortBudget()
 	if budget != nil && budget.MaxRestarts != nil && *budget.MaxRestarts < int64(len(starts)) {
 		starts = starts[:*budget.MaxRestarts]
 	}
-	return o.solveSequential(items, containers, cfg, deadline, starts, budget)
+	return o.solveSequential(items, containers, cfg, deadline, starts, budget, preloaded)
 }
 
 func (o *SolverOrchestrator) solveSequential(items []domain.ItemInstance, containers []*domain.Container,
-	cfg *config.PackingConfig, deadline *Deadline, starts []start, budget *config.EffortBudget) PortfolioRun {
+	cfg *config.PackingConfig, deadline *Deadline, starts []start, budget *config.EffortBudget,
+	preloaded []*domain.PackedContainer) PortfolioRun {
 	var results []RawSolution
 	records := make([]result.StartRecord, len(starts))
 	for index, current := range starts {
@@ -71,7 +80,7 @@ func (o *SolverOrchestrator) solveSequential(items []domain.ItemInstance, contai
 		if strings.HasSuffix(current.orderName, ":greedy") {
 			startConfig = greedyConfig(cfg)
 		}
-		outcome := o.acrossContainers(current.solver, current.order, containers, startConfig, stats, slice)
+		outcome := o.acrossContainers(current.solver, current.order, containers, startConfig, stats, slice, preloaded)
 		effortReached := slice.EffortExceeded()
 		wallReached := outcome.reached && slice.RemainingNS() <= 0
 		unpacked := outcome.unpacked
@@ -90,7 +99,7 @@ func (o *SolverOrchestrator) solveSequential(items []domain.ItemInstance, contai
 			break
 		}
 	}
-	return o.finishPortfolio(items, containers, deadline, results, records)
+	return o.finishPortfolio(items, containers, deadline, results, records, preloaded)
 }
 
 func relabelEffort(unpacked []domain.UnpackedItem) []domain.UnpackedItem {
@@ -105,7 +114,8 @@ func relabelEffort(unpacked []domain.UnpackedItem) []domain.UnpackedItem {
 }
 
 func (o *SolverOrchestrator) finishPortfolio(items []domain.ItemInstance, containers []*domain.Container,
-	deadline *Deadline, results []RawSolution, records []result.StartRecord) PortfolioRun {
+	deadline *Deadline, results []RawSolution, records []result.StartRecord,
+	preloaded []*domain.PackedContainer) PortfolioRun {
 	globalDeadline := deadline.Expired()
 	finished := make([]result.StartRecord, len(records))
 	for index, record := range records {
@@ -120,7 +130,8 @@ func (o *SolverOrchestrator) finishPortfolio(items []domain.ItemInstance, contai
 			found := o.reasons.reason(item, containers, true)
 			unpacked[index] = domain.NewUnpackedItem(item, found.code, found.details)
 		}
-		solutions = append(solutions, RawSolution{SolverName: fallbackID, Unpacked: unpacked, Stats: &SearchStats{},
+		solutions = append(solutions, RawSolution{SolverName: fallbackID,
+			Containers: append([]*domain.PackedContainer(nil), preloaded...), Unpacked: unpacked, Stats: &SearchStats{},
 			TimeLimitReached: true})
 		finished = append(finished, result.StartRecord{ID: fallbackID, Started: true, Completed: true,
 			GlobalDeadlineReached: globalDeadline})
@@ -267,7 +278,8 @@ func recordRootBound(solver SingleContainerSolver, beam bool, items []domain.Ite
 }
 
 func (o *SolverOrchestrator) acrossContainers(solver SingleContainerSolver, items []domain.ItemInstance,
-	containers []*domain.Container, cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline) planOutcome {
+	containers []*domain.Container, cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline,
+	preloaded []*domain.PackedContainer) planOutcome {
 	_, defaultSelector := o.customSelector.(DefaultContainerSelector)
 	beam := cfg.ContainerPlanBeamWidth() > 1 && (o.customSelector == nil || defaultSelector)
 	recordRootBound(solver, beam, items, containers, cfg, stats)
@@ -276,8 +288,46 @@ func (o *SolverOrchestrator) acrossContainers(solver SingleContainerSolver, item
 		selector = DefaultContainerSelector{}
 	}
 	planner := &containerPlanner{selector, o.reasons}
+	opened, reached := openPreloaded(solver, preloaded, items, containers, cfg, stats, deadline)
 	if beam {
-		return planner.plans(solver, items, containers, cfg, stats, deadline)
+		return planner.plans(solver, items, opened, reached, containers, cfg, stats, deadline)
 	}
-	return planner.greedy(solver, items, containers, cfg, stats, deadline)
+	return planner.greedy(solver, items, opened, reached, containers, cfg, stats, deadline)
+}
+
+// openPreloaded fills every container holding fixed items, first, and keeps it whatever it
+// gets, returning the plan every start continues from. A container that search cannot fill
+// (the deadline has passed, or the solver hit it) is kept with its fixed items alone:
+// dropping it would drop items the request says are already loaded. O(f * S) for f fixed
+// containers.
+func openPreloaded(solver SingleContainerSolver, preloaded []*domain.PackedContainer, items []domain.ItemInstance,
+	containers []*domain.Container, cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline) (plan, bool) {
+	current := plan{nil, items, newInventory(containers), map[string]int64{}, true, true}
+	reached := false
+	for _, fixed := range preloaded {
+		seeded := fixed.Container().WithPreloaded(fixed.Placements())
+		var one *SingleContainerSolution
+		if !reached && !deadline.Expired() {
+			var solved SingleContainerSolution
+			if !untilTimeLimit(func() {
+				solved = solver.PackOne(seeded, fixed.Sequence(), current.remaining, cfg, stats, deadline)
+			}) {
+				one = &solved
+			}
+		}
+		if one == nil || one.TimeLimitReached {
+			reached = true
+		}
+		state := NewContainerState(seeded, fixed.Sequence())
+		if one != nil {
+			state = one.State
+		}
+		committed, ids := commitState(state)
+		sequences := current.copySequences()
+		sequences[seeded.ID()] = fixed.Sequence()
+		current = plan{append(append([]*domain.PackedContainer(nil), current.packed...), committed),
+			withoutIDs(current.remaining, ids), current.stock.taken(seeded.ID()), sequences,
+			current.exhaustive && one != nil && one.Exhaustive, current.dominant && one != nil && one.DominantLattice}
+	}
+	return current, reached
 }

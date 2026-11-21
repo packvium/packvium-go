@@ -98,12 +98,39 @@ func Default(profile SolverProfile) Options {
 // PackingConfig is a validated, immutable configuration.
 type PackingConfig struct{ options Options }
 
-// New validates options in the reference order.
+// Validate refuses a limit of zero or less, which would stop every search before its first
+// step; the schema's floor for each is 1.
+func (b *EffortBudget) Validate() error {
+	if b == nil {
+		return nil
+	}
+	limits := []struct {
+		name  string
+		limit *int64
+	}{
+		{"max_candidates_evaluated", b.MaxCandidatesEvaluated}, {"max_placement_attempts", b.MaxPlacementAttempts},
+		{"max_search_nodes", b.MaxSearchNodes}, {"max_restarts", b.MaxRestarts},
+	}
+	for _, field := range limits {
+		if field.limit != nil && *field.limit < 1 {
+			return fmt.Errorf("effort_budget.%s must be at least 1", field.name)
+		}
+	}
+	return nil
+}
+
+// New validates options in the reference order: the reference builds the effort budget, and
+// refuses its limits, before the configuration that holds it.
 func New(options Options) (*PackingConfig, error) {
+	if err := options.EffortBudget.Validate(); err != nil {
+		return nil, err
+	}
 	switch {
 	case options.TimeLimitMS <= 0 || options.TopK <= 0 || options.ExactItemLimit <= 0 || options.MultiStartOrders <= 0 ||
 		options.MaxCandidatesPerItem <= 0 || options.ContainerPlanBeamWidth <= 0 || options.ContainerPlanNodeLimit <= 0:
 		return nil, errors.New("positive configuration values required")
+	case options.MaxContainers != nil && *options.MaxContainers < 1:
+		return nil, errors.New("max_containers must be at least 1")
 	case options.MaxCandidatePoints < 16:
 		return nil, errors.New("max_candidate_points must be at least 16")
 	case !(options.MinimumSupportRatio >= 0 && options.MinimumSupportRatio <= 1):

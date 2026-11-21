@@ -101,6 +101,7 @@ func validate(request *domain.PackingRequest, containers []*domain.PackedContain
 		issues = append(issues, ValidationIssue{"unknown_item", id})
 	}
 	issues = append(issues, splitGroups(containers)...)
+	issues = append(issues, fixedPlacementIssues(request, containers)...)
 	if complete {
 		issues = append(issues, partialGroups(request, containers)...)
 	}

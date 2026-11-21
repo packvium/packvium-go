@@ -65,7 +65,7 @@ func (s *HomogeneousBlockSolver) PackOne(container *domain.Container, sequence i
 }
 
 func (s *HomogeneousBlockSolver) supports(container *domain.Container, items []domain.ItemInstance) bool {
-	if len(s.constraints) > 0 || len(container.Obstacles()) > 0 || container.Axles() != nil ||
+	if len(s.constraints) > 0 || len(container.Obstacles()) > 0 || container.HasPreloaded() || container.Axles() != nil ||
 		len(container.TagLimitNames()) > 0 || container.MaxStackDensity() != nil || container.VoidFillReserveRatio() > 0 {
 		return false
 	}

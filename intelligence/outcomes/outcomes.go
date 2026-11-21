@@ -80,6 +80,9 @@ const (
 	Damage             OutcomeEventType = "damage"
 	Return             OutcomeEventType = "return"
 	OperatorOverride   OutcomeEventType = "operator_override"
+	// Recorded from an approved plan revision (package intelligence/revisionoutcomes).
+	ItemMissing       OutcomeEventType = "item_missing"
+	PlacementVerified OutcomeEventType = "placement_verified"
 )
 
 // allowedFields is the payload vocabulary per event type: deliberately narrow and structured
@@ -94,6 +97,8 @@ var allowedFields = map[OutcomeEventType][]string{
 	Damage:             {"reason_code", "severity"},
 	Return:             {"reason_code"},
 	OperatorOverride:   {"operator_id", "reason_code"},
+	ItemMissing:        {"item_type", "quantity"},
+	PlacementVerified:  {"container_type", "item_type"},
 }
 
 // AllowedFields is the sorted payload vocabulary of an event type, and whether the type is

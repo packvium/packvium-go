@@ -37,6 +37,9 @@ func (s *MaximalSpaceSolver) PackOne(container *domain.Container, sequence int64
 	for _, obstacle := range container.Obstacles() {
 		obstacleBoxes = append(obstacleBoxes, obstacle.Boxes()...)
 	}
+	for _, placement := range container.Preloaded() {
+		obstacleBoxes = append(obstacleBoxes, placement.EnvelopeBox())
+	}
 	spaces := SubtractAll([]Space{{domain.Point{}, container.InnerDimensions()}}, obstacleBoxes, stats)
 	var unplaced []domain.ItemInstance
 	batches := Batches(items)

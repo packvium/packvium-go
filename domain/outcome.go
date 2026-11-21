@@ -70,8 +70,9 @@ func stringList(values []string) []interface{} {
 
 // PackingRequest is the items and containers of one request.
 type PackingRequest struct {
-	items      []*Item
-	containers []*Container
+	items           []*Item
+	containers      []*Container
+	fixedPlacements []FixedPlacement
 }
 
 // NewPackingRequest refuses an empty side or duplicate ids.
@@ -96,7 +97,17 @@ func NewPackingRequest(items []*Item, containers []*Container) (*PackingRequest,
 		}
 		containerIDs[container.ID()] = true
 	}
-	return &PackingRequest{append([]*Item(nil), items...), append([]*Container(nil), containers...)}, nil
+	return &PackingRequest{append([]*Item(nil), items...), append([]*Container(nil), containers...), nil}, nil
+}
+
+// WithFixedPlacements is the same request with items pinned before the solve.
+func (r *PackingRequest) WithFixedPlacements(fixed []FixedPlacement) *PackingRequest {
+	return &PackingRequest{r.items, r.containers, append([]FixedPlacement(nil), fixed...)}
+}
+
+// FixedPlacements are the request's pinned items, in the order given.
+func (r *PackingRequest) FixedPlacements() []FixedPlacement {
+	return append([]FixedPlacement(nil), r.fixedPlacements...)
 }
 
 func (r *PackingRequest) Items() []*Item           { return append([]*Item(nil), r.items...) }

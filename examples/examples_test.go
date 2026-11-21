@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// The Python examples' output at v1.3.0, kept beside the programs so the test runs wherever
+// The Python examples' output at v1.4.0, kept beside the programs so the test runs wherever
 // the module does, with no checkout of the suite repository.
 const referenceDirectory = "testdata"
 
@@ -56,6 +56,9 @@ var languageWording = map[string]map[string]string{
 		"  preserved: true":                      "  preserved: True",
 		"  the approved plan is untouched: true": "  the approved plan is untouched: True",
 		"  a lock the solve cannot honour -> preserved=false, 1 lock reported back": "  a lock the solve cannot honour -> preserved=False, 1 lock reported back",
+	},
+	"revisions": {
+		"  revision 0, parent nil": "  revision 0, parent None",
 	},
 	"intelligence": {
 		"  minimum_confidence=0.9 -> nil":                                                 "  minimum_confidence=0.9 -> None",

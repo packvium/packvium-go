@@ -108,16 +108,16 @@ type trial struct {
 
 // greedy runs rounds: each round packs every container type and commits the best one.
 // O(rounds * c * S).
-func (p *containerPlanner) greedy(solver SingleContainerSolver, items []domain.ItemInstance,
+func (p *containerPlanner) greedy(solver SingleContainerSolver, items []domain.ItemInstance, start plan, reached bool,
 	containers []*domain.Container, cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline) planOutcome {
-	remaining := items
-	var packed []*domain.PackedContainer
-	reached, exhaustive, dominantLattice := false, true, true
-	stock := newInventory(containers)
-	sequence := map[string]int64{}
+	remaining := start.remaining
+	packed := append([]*domain.PackedContainer(nil), start.packed...)
+	exhaustive, dominantLattice := start.exhaustive, start.dominant
+	stock := start.stock
+	sequence := start.copySequences()
 	maximum := maximumContainers(containers, items, cfg)
 	ordered := orderedContainers(containers)
-	for len(remaining) > 0 && int64(len(packed)) < maximum {
+	for len(remaining) > 0 && int64(len(packed)) < maximum && !reached {
 		if deadline.Expired() {
 			reached = true
 			break
@@ -202,20 +202,23 @@ func (p *containerPlanner) roundScore(container *domain.Container, one SingleCon
 }
 
 // commitState freezes a finished state into a packed container, loads assigned, and the ids
-// it consumed.
+// it consumed. The packed container is the request's, not the seeded instance: anything that
+// rebuilds a state from a packed container re-adds every placement itself, and a seeded
+// container would add the fixed ones twice.
 func commitState(state *ContainerState) (*domain.PackedContainer, map[string]bool) {
 	ids := map[string]bool{}
+	container := state.Container.WithoutPreloaded()
 	if state.LatticeSummary != nil {
 		for _, item := range state.LatticeItems {
 			ids[item.ID()] = true
 		}
-		return domain.NewLatticePackedContainer(state.Container, state.Sequence, state.LatticeSummary,
+		return domain.NewLatticePackedContainer(container, state.Sequence, state.LatticeSummary,
 			state.LatticeItems), ids
 	}
 	for _, placement := range state.Placements {
 		ids[placement.Instance().ID()] = true
 	}
-	return domain.NewPackedContainer(state.Container, state.Sequence, AssignTopLoads(state.Placements)), ids
+	return domain.NewPackedContainer(container, state.Sequence, AssignTopLoads(state.Placements)), ids
 }
 
 func (p *containerPlanner) explainAll(remaining []domain.ItemInstance, containers []*domain.Container, reached bool,
@@ -227,25 +230,36 @@ func (p *containerPlanner) explainAll(remaining []domain.ItemInstance, container
 	return unpacked
 }
 
-// plan is a partial container plan in the beam.
+// plan is a partial container plan: the containers committed so far, the items left, the
+// stock left and the last instance number opened per container type.
 type plan struct {
 	packed     []*domain.PackedContainer
 	remaining  []domain.ItemInstance
 	stock      inventory
-	sequence   int64
+	sequences  map[string]int64
 	exhaustive bool
 	dominant   bool
+}
+
+func (p plan) copySequences() map[string]int64 {
+	copied := make(map[string]int64, len(p.sequences)+1)
+	for id, sequence := range p.sequences {
+		copied[id] = sequence
+	}
+	return copied
 }
 
 // plans is a beam over whole container plans. Each level expands every plan by every
 // container type, keeps the best per (remaining items, inventory) signature, and ranks by an
 // admissible bound. O(levels * width * c * S) with the node limit as a hard cap.
-func (p *containerPlanner) plans(solver SingleContainerSolver, items []domain.ItemInstance,
+func (p *containerPlanner) plans(solver SingleContainerSolver, items []domain.ItemInstance, initial plan, reached bool,
 	containers []*domain.Container, cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline) planOutcome {
-	initial := plan{nil, items, newInventory(containers), 0, true, true}
-	beam := []plan{initial}
+	var beam []plan
+	if !reached {
+		beam = []plan{initial}
+	}
 	incumbent := initial
-	nodes, reached := int64(0), false
+	nodes := int64(0)
 	maximum := maximumContainers(containers, items, cfg)
 	ordered := orderedContainers(containers)
 	for len(beam) > 0 && nodes < cfg.ContainerPlanNodeLimit() {
@@ -271,7 +285,7 @@ func (p *containerPlanner) plans(solver SingleContainerSolver, items []domain.It
 				nodes++
 				var one SingleContainerSolution
 				if untilTimeLimit(func() {
-					one = solver.PackOne(container, current.sequence+1, current.remaining, cfg, stats, deadline)
+					one = solver.PackOne(container, current.sequences[container.ID()]+1, current.remaining, cfg, stats, deadline)
 				}) {
 					reached = true
 					break
@@ -306,7 +320,9 @@ func (p *containerPlanner) plans(solver SingleContainerSolver, items []domain.It
 func extendPlan(current plan, container *domain.Container, one SingleContainerSolution) plan {
 	committed, ids := commitState(one.State)
 	packed := append(append([]*domain.PackedContainer(nil), current.packed...), committed)
-	return plan{packed, withoutIDs(current.remaining, ids), current.stock.taken(container.ID()), current.sequence + 1,
+	sequences := current.copySequences()
+	sequences[container.ID()]++
+	return plan{packed, withoutIDs(current.remaining, ids), current.stock.taken(container.ID()), sequences,
 		current.exhaustive && one.Exhaustive, current.dominant && one.DominantLattice}
 }
 

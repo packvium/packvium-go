@@ -61,12 +61,17 @@ func encodeContainer(packed *domain.PackedContainer, lengthUnit, weightUnit stri
 	container := packed.Container()
 	placements := make([]interface{}, 0, len(packed.Placements()))
 	for _, placement := range packed.Placements() {
-		placements = append(placements, map[string]interface{}{
+		encoded := map[string]interface{}{
 			"item_id": placement.Instance().ID(), "item_type": placement.Instance().Item().ID(),
 			"position": placement.Position().ToMap(lengthUnit), "dimensions": placement.Dimensions().ToMap(lengthUnit),
 			"orientation": string(placement.Rotation()), "support_ratio": fixed6(placement.SupportRatio()),
 			"top_load": placement.TopLoad().ToMap(weightUnit),
-		})
+		}
+		// Absent unless true, so a request without fixed placements keeps its bytes.
+		if placement.Fixed() {
+			encoded["fixed"] = true
+		}
+		placements = append(placements, encoded)
 	}
 	out := map[string]interface{}{
 		"id": packed.ID(), "container_type": container.ID(),

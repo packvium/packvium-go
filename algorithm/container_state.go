@@ -48,8 +48,8 @@ type ContainerState struct {
 	usableVolume   *big.Int
 }
 
-// NewContainerState is an empty container: its obstacles are solid and the origin plus every
-// point an obstacle exposes are free.
+// NewContainerState is a container holding only its preloaded items: its obstacles are solid
+// and the origin plus every point an obstacle or a preloaded item exposes are free.
 func NewContainerState(container *domain.Container, sequence int64) *ContainerState {
 	inner := container.InnerDimensions()
 	state := &ContainerState{
@@ -66,6 +66,11 @@ func NewContainerState(container *domain.Container, sequence int64) *ContainerSt
 	state.absorb([]domain.Point{{}})
 	for _, box := range obstacles {
 		state.absorb(state.exposedPoints(box))
+	}
+	// Fixed items enter as real placements, so payload, support, top load and every other
+	// rule that reads Placements holds for them with no rule of its own.
+	for _, placement := range container.Preloaded() {
+		state.Add(placement)
 	}
 	return state
 }

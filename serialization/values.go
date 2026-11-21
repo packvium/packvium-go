@@ -199,6 +199,25 @@ func (o object) strings(key string) ([]string, error) {
 	return texts, nil
 }
 
+// tagSet is the reference's frozenset() of a list: a list or an object among the members has
+// no hash there, so it is refused rather than spelled as text.
+func (o object) tagSet(key string) ([]string, error) {
+	value, _ := o.get(key)
+	list, err := asList(value, key)
+	if err != nil {
+		return nil, err
+	}
+	for _, element := range list {
+		switch element.(type) {
+		case []interface{}:
+			return nil, errors.New("unhashable type: 'list'")
+		case map[string]interface{}:
+			return nil, errors.New("unhashable type: 'dict'")
+		}
+	}
+	return o.strings(key)
+}
+
 // quantity turns a JSON magnitude into a units.Quantity, keeping floats out of geometry.
 func quantity(value interface{}, kind string) (units.Quantity, error) {
 	switch typed := value.(type) {
@@ -214,9 +233,24 @@ func quantity(value interface{}, kind string) (units.Quantity, error) {
 	case string:
 		return units.TextQuantity(typed), nil
 	case float64:
-		return units.Quantity{}, fmt.Errorf("float %s input is intentionally rejected; use a decimal string", kind)
+		// A fraction in binary floating point is not the decimal the caller wrote; an integral
+		// float is exact, and JavaScript cannot send anything else for 100.
+		if typed != math.Trunc(typed) || math.IsInf(typed, 0) {
+			return units.Quantity{}, fmt.Errorf("float %s input is intentionally rejected; use a decimal string", kind)
+		}
+		whole, _ := big.NewFloat(typed).Int(nil)
+		return units.BigQuantity(whole), nil
 	}
 	return units.TextQuantity(toText(value)), nil
+}
+
+// objectQuantity is the magnitude of the {value, unit} form, which the reference reads as the
+// text of the value, so a float there is its shortest spelling rather than a refusal.
+func objectQuantity(value interface{}, kind string) (units.Quantity, error) {
+	if typed, ok := value.(float64); ok {
+		return units.TextQuantity(jsonvalue.FloatRepr(typed)), nil
+	}
+	return quantity(value, kind)
 }
 
 // parseLength is the reference's Length.parse over a wire value, including the
@@ -227,7 +261,7 @@ func parseLength(value interface{}, defaultUnit string) (units.Length, error) {
 		if !present {
 			return units.Length{}, errors.New("'value'")
 		}
-		magnitude, err := quantity(raw, "length")
+		magnitude, err := objectQuantity(raw, "length")
 		if err != nil {
 			return units.Length{}, err
 		}
@@ -250,7 +284,7 @@ func parseWeight(value interface{}, defaultUnit string) (units.Weight, error) {
 		if !present {
 			return units.Weight{}, errors.New("'value'")
 		}
-		magnitude, err := quantity(raw, "weight")
+		magnitude, err := objectQuantity(raw, "weight")
 		if err != nil {
 			return units.Weight{}, err
 		}
