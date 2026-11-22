@@ -51,7 +51,7 @@ func requireFixedShape(raw interface{}, where, field, unit string) error {
 		return malformed(where+" is an object", field)
 	}
 	if unknown := pointshape.UnknownKeys(entry, fixedFields); len(unknown) > 0 {
-		return malformed(where+" does not carry "+canonicaljson.Spelling(unknown), field)
+		return malformed(where+" cannot carry "+canonicaljson.Spelling(unknown), field)
 	}
 	var missing []interface{}
 	for _, name := range fixedRequired {

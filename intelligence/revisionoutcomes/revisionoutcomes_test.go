@@ -14,7 +14,7 @@ import (
 
 func revision(t *testing.T) map[string]interface{} {
 	t.Helper()
-	value, err := jsonvalue.DecodeBytes([]byte(`{"format": "packvium-plan-revision/v1", "suite_version": "1.4.0",
+	value, err := jsonvalue.DecodeBytes([]byte(`{"format": "packvium-plan-revision/v1", "suite_version": "1.5.0",
 	  "revision": 1, "parent": "sha256:00", "approved": null, "request": {},
 	  "events": [
 	    {"sequence": 1, "type": "placement_locked", "placement": {"item_type": "cube", "container_type": "box",

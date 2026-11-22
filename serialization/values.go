@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -104,8 +105,30 @@ func toInt(value interface{}, name string) (int64, error) {
 			return 0, fmt.Errorf("invalid literal for int() with base 10: '%s'", typed)
 		}
 		return parsed, nil
+	case []interface{}, map[string]interface{}:
+		return 0, fmt.Errorf("int() argument must be a string, a bytes-like object or a real number, not '%s'",
+			pythonType(value))
 	}
 	return 0, fmt.Errorf("%s must be an integer", name)
+}
+
+// pythonType is the reference's type name of a decoded JSON value.
+func pythonType(value interface{}) string {
+	switch value.(type) {
+	case []interface{}:
+		return "list"
+	case map[string]interface{}:
+		return "dict"
+	case string:
+		return "str"
+	case bool:
+		return "bool"
+	case float64:
+		return "float"
+	case int64, *big.Int:
+		return "int"
+	}
+	return "NoneType"
 }
 
 func (o object) integer(key string, fallback int64) (int64, error) {
@@ -197,6 +220,33 @@ func (o object) strings(key string) ([]string, error) {
 		texts[index] = toText(element)
 	}
 	return texts, nil
+}
+
+// iterated is the reference's tuple() of a value: a list's elements, a string's characters,
+// an object's keys (in code point order: a decoded Go map has lost the order they were
+// written in), and a refusal for a number or a boolean. Each element is spelled as str().
+func (o object) iterated(key string) ([]string, error) {
+	value, _ := o.get(key)
+	switch typed := value.(type) {
+	case nil:
+		return nil, nil
+	case []interface{}:
+		return o.strings(key)
+	case string:
+		characters := make([]string, 0, len(typed))
+		for _, character := range typed {
+			characters = append(characters, string(character))
+		}
+		return characters, nil
+	case map[string]interface{}:
+		keys := make([]string, 0, len(typed))
+		for name := range typed {
+			keys = append(keys, name)
+		}
+		sort.Strings(keys)
+		return keys, nil
+	}
+	return nil, fmt.Errorf("'%s' object is not iterable", pythonType(value))
 }
 
 // tagSet is the reference's frozenset() of a list: a list or an object among the members has

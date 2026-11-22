@@ -1,6 +1,7 @@
 package algorithm
 
 import (
+	"math"
 	"math/big"
 	"sort"
 
@@ -35,6 +36,7 @@ func BeamPack(container *domain.Container, sequence int64, items []domain.ItemIn
 	// nodeKey builds an O(m) placement signature and a knapsack bound; computing it once per
 	// node instead of once per comparison changes no ordering.
 	incumbentKey := nodeKey(incumbent, futureCosts{})
+	incumbentUnplaced := int64(len(incumbent.unplaced))
 	for position, batch := range batches {
 		var expansions []beamNode
 		exhausted := false
@@ -61,10 +63,15 @@ func BeamPack(container *domain.Container, sequence int64, items []domain.ItemIn
 			// The key of the expansion with every later batch left unplaced, built without the
 			// concatenation unless it wins.
 			unplaced := int64(len(expansion.unplaced) + len(future))
+			// More unplaced items loses on the key's first component whatever follows, so the
+			// signature -- the costly O(m) part -- is built only for a candidate that can win.
+			if unplaced > incumbentUnplaced {
+				continue
+			}
 			candidateKey := stateKey(expansion.state, unplaced, unplaced)
 			if candidateKey.Compare(incumbentKey) < 0 {
 				incumbent = beamNode{expansion.state, concatInstances(expansion.unplaced, future)}
-				incumbentKey = candidateKey
+				incumbentKey, incumbentUnplaced = candidateKey, unplaced
 			}
 		}
 		if len(expansions) == 0 {
@@ -200,9 +207,9 @@ func Extended(state *ContainerState, item domain.ItemInstance, candidate Candida
 	return child
 }
 
-// futureCosts are the later batches' volumes and weights, each sorted once per beam level
-// rather than once per node: O(f log f) per level instead of O(w f log f). A nil list means
-// that bound does not apply (a nesting item, or no payload limit).
+// futureCosts are the prefix sums of the later batches' ascending volumes and weights, built
+// once per beam level rather than once per node: O(f log f) per level instead of O(w f log f).
+// A nil list means that bound does not apply (a nesting item, or no payload limit).
 type futureCosts struct {
 	volumes []*big.Int
 	weights []int64
@@ -219,46 +226,49 @@ func newFutureCosts(future []domain.ItemInstance, payloadLimited bool) futureCos
 		nesting = nesting || item.Item().NestingHeight() != nil
 	}
 	if !nesting {
-		costs.volumes = make([]*big.Int, len(future))
+		volumes := make([]*big.Int, len(future))
 		for index, item := range future {
-			costs.volumes[index] = item.Item().Dimensions().Volume()
+			volumes[index] = item.Item().Dimensions().Volume()
 		}
-		sort.Slice(costs.volumes, func(i, j int) bool { return costs.volumes[i].Cmp(costs.volumes[j]) < 0 })
+		sort.Slice(volumes, func(i, j int) bool { return volumes[i].Cmp(volumes[j]) < 0 })
+		for index := 1; index < len(volumes); index++ {
+			volumes[index] = new(big.Int).Add(volumes[index-1], volumes[index])
+		}
+		costs.volumes = volumes
 	}
 	if payloadLimited {
-		costs.weights = make([]int64, len(future))
+		weights := make([]int64, len(future))
 		for index, item := range future {
-			costs.weights[index] = item.Item().Weight().Ticks()
+			weights[index] = item.Item().Weight().Ticks()
 		}
-		sort.Slice(costs.weights, func(i, j int) bool { return costs.weights[i] < costs.weights[j] })
+		sort.Slice(weights, func(i, j int) bool { return weights[i] < weights[j] })
+		costs.weights = cumulativeWeights(weights)
 	}
 	return costs
 }
 
-// countWithinVolume is how many of the cheapest future items could still fit by volume alone,
-// over ascending volumes. O(f).
-func countWithinVolume(sorted []*big.Int, capacity *big.Int) int64 {
-	used, count := new(big.Int), int64(0)
-	for _, cost := range sorted {
-		next := new(big.Int).Add(used, cost)
-		if next.Cmp(capacity) > 0 {
-			break
-		}
-		used, count = next, count+1
-	}
-	return count
+// countWithinVolume is how many of the cheapest future items could still fit by volume alone.
+// Choosing the cheapest first can only overestimate how many fit, so the bound stays
+// admissible; costs are non-negative, so the prefix sums never decrease and the count is one
+// binary search: O(log f) per node instead of O(f), with no allocation.
+func countWithinVolume(cumulative []*big.Int, capacity *big.Int) int64 {
+	return int64(sort.Search(len(cumulative), func(index int) bool { return cumulative[index].Cmp(capacity) > 0 }))
 }
 
-func countWithinWeight(sorted []int64, capacity int64) int64 {
-	used, count := int64(0), int64(0)
-	for _, weight := range sorted {
-		if used+weight > capacity {
-			break
+// cumulativeWeights is the prefix sums of ascending weights, cut before the first sum past
+// the int64 range: no capacity is that large, so no count can reach those entries anyway.
+func cumulativeWeights(ascending []int64) []int64 {
+	for index := 1; index < len(ascending); index++ {
+		if ascending[index] > math.MaxInt64-ascending[index-1] {
+			return ascending[:index]
 		}
-		used += weight
-		count++
+		ascending[index] += ascending[index-1]
 	}
-	return count
+	return ascending
+}
+
+func countWithinWeight(cumulative []int64, capacity int64) int64 {
+	return int64(sort.Search(len(cumulative), func(index int) bool { return cumulative[index] > capacity }))
 }
 
 // unpackedLowerBound is an admissible volume and weight bound on the final unpacked count.

@@ -13,6 +13,11 @@ import (
 // HomogeneousBlockSolver is a deterministic solid single-type block search for unrestricted
 // carton loading.
 //
+// A block is used only for the plain-box subset no per-placement business rule can
+// distinguish, and only when no support is required: a block set on a smaller one overhangs
+// it, so the members of its bottom layer report the support they really have. Requests
+// outside that subset fall back to the extreme-point beam rather than weakening a constraint.
+//
 // Candidate enumeration is O(B*S*T*R*X*Y) time and O(S+n) space: B committed blocks, S the
 // capped maximal-space count, T declared item types, R unique rotations, X/Y the block grid
 // extents. Both the deadline and containerPlanNodeLimit bound the product explicitly.
@@ -39,7 +44,7 @@ const (
 // PackOne keeps the better of a count-first and a volume-first block search.
 func (s *HomogeneousBlockSolver) PackOne(container *domain.Container, sequence int64, items []domain.ItemInstance,
 	cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline) SingleContainerSolution {
-	if !s.supports(container, items) {
+	if !s.supports(container, items, cfg) {
 		return NewExtremePointSolver(s.constraints, DefaultCandidateScorer{}).PackOne(container, sequence, items, cfg,
 			stats, deadline)
 	}
@@ -64,8 +69,10 @@ func (s *HomogeneousBlockSolver) PackOne(container *domain.Container, sequence i
 	return SingleContainerSolution{State: best.State, Unpacked: best.Unpacked, TimeLimitReached: reached}
 }
 
-func (s *HomogeneousBlockSolver) supports(container *domain.Container, items []domain.ItemInstance) bool {
+func (s *HomogeneousBlockSolver) supports(container *domain.Container, items []domain.ItemInstance,
+	cfg *config.PackingConfig) bool {
 	if len(s.constraints) > 0 || len(container.Obstacles()) > 0 || container.HasPreloaded() || container.Axles() != nil ||
+		cfg.MinimumSupportRatio() > 0 ||
 		len(container.TagLimitNames()) > 0 || container.MaxStackDensity() != nil || container.VoidFillReserveRatio() > 0 {
 		return false
 	}
@@ -79,7 +86,7 @@ func (s *HomogeneousBlockSolver) supports(container *domain.Container, items []d
 
 func unrestricted(item *domain.Item) bool {
 	rule := item.GroundContactRule()
-	return item.Group() == nil && item.Tags().Len() == 0 && item.IncompatibleTags().Len() == 0 &&
+	return item.ShapeType() == domain.RigidCuboid && item.Group() == nil && item.Tags().Len() == 0 && item.IncompatibleTags().Len() == 0 &&
 		item.EligibleContainerTags().Len() == 0 && item.Stackable() && !item.MustBeOnFloor() &&
 		item.MaxTopLoad() == nil && item.MaxStackedItems() == nil && item.MinimumSupportRatio() == 0.0 &&
 		(rule == nil || *rule == "free") && item.NestingHeight() == nil && item.StopIndex() == nil
@@ -265,8 +272,15 @@ func commitBlock(state *ContainerState, chosen *block, instances []domain.ItemIn
 				point := domain.MustPoint(origin.X()+x*chosen.envelope.Length().Ticks(),
 					origin.Y()+y*chosen.envelope.Width().Ticks(), origin.Z()+z*chosen.envelope.Height().Ticks())
 				position := domain.MustPoint(point.X()+clearance, point.Y()+clearance, point.Z()+clearance)
+				// Above its bottom layer a member rests on an identical footprint; the bottom
+				// layer rests on whatever is there.
+				support := 1.0
+				if z == 0 {
+					// O(m) over the m placements already in the container, once per bottom member.
+					support = SupportRatio(state, instances[index], Candidate{Point: point, EnvelopeDimensions: chosen.envelope})
+				}
 				state.AddDirect(domain.NewPlacement(instances[index], position, chosen.rotation, chosen.physical, point,
-					chosen.envelope, 1.0))
+					chosen.envelope, support))
 				index++
 				stats.CandidatesEvaluated++
 				stats.PlacementsAttempted++

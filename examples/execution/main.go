@@ -40,7 +40,7 @@ type object = map[string]interface{}
 // target -- nothing in this scene comes close to it.
 const requestJSON = `{
   "units": {"length": "mm"},
-  "configuration": {"objective": "default", "profile": "balanced", "seed": 42, "time_limit_ms": 60000},
+  "configuration": {"objective": "default", "solver_profile": "balanced", "seed": 42, "time_limit_ms": 60000},
   "items": [
     {"id": "printer", "quantity": 1, "weight": "9 kg", "keep_upright": true,
      "dimensions": {"length": "420", "width": "340", "height": "260"}},

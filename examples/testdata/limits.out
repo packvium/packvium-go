@@ -1,0 +1,49 @@
+
+==============================================================================
+1. The plan
+==============================================================================
+  status: feasible
+    reefer-van#1   3 frozen-tote, 1 lithium-battery, 22 parcel
+    cargo-bike#1   2 lithium-battery, 2 parcel
+
+  All three frozen totes are in the van, because nothing else is refrigerated. Only
+  one battery rides in the van; the other two go by bike. The bike takes four items,
+  its `max_items`, although there is room and payload for more.
+
+==============================================================================
+2. What the obstacles cost
+==============================================================================
+  parcels in the van with the fridge unit and arches: 22
+  parcels in the van if it were an empty box:        24
+
+  An obstacle is exact space, not a hint. Model what is really there, or the plan
+  will put a parcel where the wheel arch is.
+
+==============================================================================
+3. `max_containers`: the plan may use one vehicle
+==============================================================================
+  status: best_found
+    reefer-van#1   2 frozen-tote, 1 lithium-battery, 23 parcel
+    left out: 1 frozen-tote, no_feasible_placement (observed)
+    left out: 2 lithium-battery, no_feasible_placement (observed)
+    left out: 1 parcel, no_feasible_placement (observed)
+
+  The cap is honoured, and what does not fit is listed rather than silently sent in
+  a vehicle you did not allow. The reason is `observed`, not `proven`: the search
+  found no room for these, which is not a claim that no arrangement has room.
+
+==============================================================================
+4. `eligible_container_tags`: the van is off the road today
+==============================================================================
+  status: best_found
+    cargo-bike#1   4 parcel
+    cargo-bike#2   4 parcel
+    cargo-bike#3   4 parcel
+    left out: 3 frozen-tote, no_eligible_container (proven)
+    left out: 3 lithium-battery, no_feasible_placement (observed)
+    left out: 12 parcel, no_feasible_placement (observed)
+
+  The frozen totes cannot go anywhere, and their reason is `proven`: no container in
+  the request carries the tag they need, which is a fact about the request rather
+  than about how far the search got. The rest is `observed`: three bikes of four
+  items each were all the request offered, and the search ran out of them.

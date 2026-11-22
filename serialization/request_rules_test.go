@@ -192,12 +192,37 @@ func TestRefusalsTheRuleTableLeavesToTheModelBuilders(t *testing.T) {
 			"invalid_request: unhashable type: 'dict'"},
 		{"null length unit", func(r map[string]interface{}) { r["units"] = map[string]interface{}{"length": nil} },
 			"invalid_request: unsupported length unit: None"},
+		{"list seed", setConfiguration("seed", []interface{}{int64(1)}),
+			"invalid_request: int() argument must be a string, a bytes-like object or a real number, not 'list'"},
+		{"object seed", setConfiguration("seed", map[string]interface{}{"value": "1"}),
+			"invalid_request: int() argument must be a string, a bytes-like object or a real number, not 'dict'"},
+		{"number solvers", setConfiguration("solvers", int64(1)), "invalid_request: 'int' object is not iterable"},
+		{"boolean solvers", setConfiguration("solvers", true), "invalid_request: 'bool' object is not iterable"},
 	}
 	for _, testCase := range cases {
 		refusal := refusalOf(t, testCase.edit)
 		if refusal.Reason != "invalid_value" || refusal.Field != "" || refusal.Error() != testCase.message {
 			t.Errorf("%s: %#v", testCase.name, refusal)
 		}
+	}
+}
+
+func setConfiguration(key string, value interface{}) func(map[string]interface{}) {
+	return func(r map[string]interface{}) { r["configuration"].(map[string]interface{})[key] = value }
+}
+
+// TestSolversAreIteratedAsTheReferenceIteratesThem: an empty object is no solver at all, and
+// a string is its characters, each an unknown solver name.
+func TestSolversAreIteratedAsTheReferenceIteratesThem(t *testing.T) {
+	request := validRequest()
+	setConfiguration("solvers", map[string]interface{}{})(request)
+	if _, err := Pack(request); err != nil {
+		t.Fatalf("an empty object of solvers was refused: %v", err)
+	}
+	request = validRequest()
+	setConfiguration("solvers", "x")(request)
+	if _, err := Pack(request); err == nil || !strings.Contains(err.Error(), "unknown solver name(s) ['x']") {
+		t.Fatalf("got %v", err)
 	}
 }
 

@@ -10,7 +10,7 @@
 //
 // An extension point is an in-process, one-language interface. A custom constraint has no
 // representation on the wire, so an engine driven over JSON cannot see it, and the
-// cross-language conformance harness cannot check that the engines agree about it. Use
+// cross-language test suite cannot check that the engines agree about it. Use
 // these to specialise one application in one language. A rule that must hold for every
 // caller of every binding belongs in the request as data instead -- as a policy rule, a
 // tag, or a field.

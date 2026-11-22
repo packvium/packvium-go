@@ -39,7 +39,7 @@ func RequirePoint(point interface{}, where, field string, refuse Refusal) error 
 		return refuse(where+" is a point object", field)
 	}
 	if unknown := UnknownKeys(members, Axes); len(unknown) > 0 {
-		return refuse(where+" does not carry "+canonicaljson.Spelling(unknown), field)
+		return refuse(where+" cannot carry "+canonicaljson.Spelling(unknown), field)
 	}
 	for _, axis := range Axes {
 		value, present := members[axis]

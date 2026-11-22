@@ -1,6 +1,7 @@
 package algorithm
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/packvium/packvium-go/config"
@@ -63,6 +64,7 @@ func (o *SolverOrchestrator) solveSequential(items []domain.ItemInstance, contai
 	cfg *config.PackingConfig, deadline *Deadline, starts []start, budget *config.EffortBudget,
 	preloaded []*domain.PackedContainer) PortfolioRun {
 	var results []RawSolution
+	completed := map[string]start{}
 	records := make([]result.StartRecord, len(starts))
 	for index, current := range starts {
 		records[index] = result.StartRecord{ID: current.id()}
@@ -71,13 +73,20 @@ func (o *SolverOrchestrator) solveSequential(items []domain.ItemInstance, contai
 		if deadline.Expired() {
 			break
 		}
+		if isRefinement(current.orderName) {
+			refined, eligible := refinementOf(current, results, completed, cfg)
+			if !eligible {
+				continue
+			}
+			current = refined
+		}
 		stats := &SearchStats{}
 		slice := deadline.Slice(int64(len(starts) - position))
 		if budget != nil {
 			slice = slice.WithEffort(budget, stats)
 		}
 		startConfig := cfg
-		if strings.HasSuffix(current.orderName, ":greedy") {
+		if strings.HasSuffix(current.orderName, ":greedy") || strings.Contains(current.orderName, ":late_") {
 			startConfig = greedyConfig(cfg)
 		}
 		outcome := o.acrossContainers(current.solver, current.order, containers, startConfig, stats, slice, preloaded)
@@ -89,6 +98,7 @@ func (o *SolverOrchestrator) solveSequential(items []domain.ItemInstance, contai
 		}
 		results = append(results, RawSolution{current.id(), outcome.packed, unpacked, stats, wallReached, effortReached,
 			outcome.proven})
+		completed[current.id()] = current
 		records[position] = result.StartRecord{ID: current.id(), Started: true, Completed: !outcome.reached,
 			Truncated: outcome.reached}
 		// A single type's densest packing is the lattice just tried: once it placed everything,
@@ -155,22 +165,97 @@ func (o *SolverOrchestrator) starts(items []domain.ItemInstance, cfg *config.Pac
 	if cfg.ContainerPlanBeamWidth() <= 1 || cfg.Profile() != config.Quality {
 		return starts
 	}
-	withGreedy := make([]start, 0, len(starts)+2)
-	for _, current := range starts {
+	withGreedy := make([]start, 0, len(starts))
+	var extreme *start
+	for index, current := range starts {
 		if current.solver.Name() != "homogeneous_blocks" {
 			current.orderName += ":greedy"
 		}
 		withGreedy = append(withGreedy, current)
-	}
-	refinements := 0
-	for _, current := range starts {
-		if current.solver.Name() == "extreme_points" && refinements < 2 {
-			current.orderName += ":beam"
-			withGreedy = append(withGreedy, current)
-			refinements++
+		if extreme == nil && current.solver.Name() == "extreme_points" {
+			extreme = &starts[index]
 		}
 	}
-	return withGreedy
+	if extreme == nil {
+		return withGreedy
+	}
+	// The refinements are placeholders until they run: each re-runs the best eligible
+	// extreme-point answer found before it (refinementOf), so its solver and order are only
+	// known then. One neighbourhood start per item type, then the beam over the best answer.
+	for _, itemType := range sortedItemTypes(items) {
+		withGreedy = append(withGreedy, start{extreme.solver, neighbourhoodPrefix + itemType, extreme.order})
+	}
+	return append(withGreedy, start{extreme.solver, bestBeam, extreme.order})
+}
+
+const (
+	neighbourhoodPrefix = "neighborhood:"
+	bestBeam            = "best:beam"
+)
+
+func sortedItemTypes(items []domain.ItemInstance) []string {
+	seen := map[string]bool{}
+	var types []string
+	for _, item := range items {
+		if id := item.Item().ID(); !seen[id] {
+			seen[id] = true
+			types = append(types, id)
+		}
+	}
+	sort.Strings(types)
+	return types
+}
+
+func isRefinement(orderName string) bool {
+	return strings.HasPrefix(orderName, neighbourhoodPrefix) || strings.HasSuffix(orderName, ":beam")
+}
+
+// refinementOf turns a placeholder refinement into the start it runs: the best answer so far
+// from the built-in extreme-point solver (a greedy one, for a neighbourhood), ranked by the
+// configured objective and then by start id. A neighbourhood re-runs that answer's order with
+// one item type moved to the end; the beam re-runs it as it was, with the beams on. False
+// when no answer is eligible, and the start is skipped. O(r * c) for r answers so far.
+func refinementOf(placeholder start, results []RawSolution, completed map[string]start,
+	cfg *config.PackingConfig) (start, bool) {
+	neighbourhood := strings.HasPrefix(placeholder.orderName, neighbourhoodPrefix)
+	scorer := ResolveObjective(cfg.Objective(), cfg)
+	var best *RawSolution
+	var bestScore ObjectiveScore
+	for index := range results {
+		candidate := &results[index]
+		if _, builtIn := completed[candidate.SolverName].solver.(*ExtremePointSolver); !builtIn {
+			continue
+		}
+		if neighbourhood && !strings.HasSuffix(candidate.SolverName, ":greedy") {
+			continue
+		}
+		score := scorer.Score(*candidate)
+		if best == nil {
+			best, bestScore = candidate, score
+			continue
+		}
+		if order := score.Compare(bestScore); order < 0 || (order == 0 && candidate.SolverName < best.SolverName) {
+			best, bestScore = candidate, score
+		}
+	}
+	if best == nil {
+		return start{}, false
+	}
+	base := completed[best.SolverName]
+	if !neighbourhood {
+		return start{base.solver, base.orderName + ":beam", base.order}, true
+	}
+	itemType := strings.TrimPrefix(placeholder.orderName, neighbourhoodPrefix)
+	late := make([]domain.ItemInstance, 0, len(base.order))
+	var moved []domain.ItemInstance
+	for _, item := range base.order {
+		if item.Item().ID() == itemType {
+			moved = append(moved, item)
+		} else {
+			late = append(late, item)
+		}
+	}
+	return start{base.solver, base.orderName + ":late_" + itemType, append(late, moved...)}, true
 }
 
 // greedyConfig is the same configuration with the beams switched off, for the cheap greedy

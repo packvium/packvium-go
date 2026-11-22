@@ -239,7 +239,7 @@ func decodeConfig(cfg object, unit string) (*config.PackingConfig, error) {
 			return nil, err
 		}
 	}
-	if options.Solvers, err = cfg.strings("solvers"); err != nil {
+	if options.Solvers, err = cfg.iterated("solvers"); err != nil {
 		return nil, err
 	}
 	options.Objective = cfg.text("objective", "default")

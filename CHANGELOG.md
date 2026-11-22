@@ -4,6 +4,56 @@ What changed in the Go module `github.com/packvium/packvium-go`, release by rele
 format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0]
+
+Answers every request the way Packvium 1.5.0 does in the other languages, checked byte for
+byte against the 1.5.0 conformance corpus: 402 packing fixtures, 6 refusal cases, 55
+commerce cases, the execution plan of every golden result, 423 operational-artifact cases,
+102 plan-revision cases and 131 malformed requests. Every 1.4.0 golden result keeps its bytes.
+Packvium 1.5.0 is also a hosted API; that service is built on the libraries and is not part of
+this module.
+
+### Added
+
+- **Weight rebalancing.** `packer.RebalanceWeight` evens out the payload of a finished
+  multi-container packing: one item at a time, from the heaviest container to a lighter one,
+  each move kept only when the item has a real place in its new container and the whole
+  packing still passes the independent validator. It never adds a container, drops an item or
+  moves a fixed placement, and under a landed-cost objective it refuses what `Pack` refuses.
+  `packer.DefaultRebalanceOptions` is 64 moves within one second.
+- `artifacts.ReplayLevel`: `exact` or `not_guaranteed`, the replay promise an artifact of a
+  result would make, without building the artifact.
+- Six examples, each printing what its Python counterpart prints: `errors`,
+  `fixed_placements`, `limits`, `rebalancing`, `reproducibility` and `trucking`.
+
+### Changed
+
+- The `serialization` and `execution` examples send `solver_profile` and `alternatives`,
+  not `profile` and `top_k`, which are now refused.
+- The single-container beam skips a candidate that cannot beat the incumbent before building
+  its placement signature, and reads its volume and weight bound from prefix sums with a
+  binary search; the maximal-space containment scan stops at the first space that starts
+  higher. Answers are unchanged.
+
+### Fixed
+
+- **A misspelt `configuration` or `effort_budget` key is refused** with reason `not_allowed`
+  and its pointer (`/configuration/profile`) instead of being ignored, so the request no
+  longer runs on defaults. `parallel` is refused the same way. An unknown `objective` or
+  access direction is `not_allowed` with its pointer, and a fixed placement or point with an
+  extra key "cannot carry" it, in the words of every other engine.
+- A list or object `seed` is refused with the other engines' message, and `solvers` that is
+  a number or boolean is "not iterable"; an empty object of solvers is accepted as none.
+- **The quality profile runs the reference's refinement starts.** After its greedy starts it
+  now re-runs the best extreme-point answer once per item type with that type moved to the end
+  of the order, and then as a beam, as the other engines do; before, it ran a beam over the
+  first two extreme-point orders instead. A quality request can therefore get a different,
+  and the reference's, answer; every golden result keeps its bytes.
+- **The block solver reports the support its members really have.** A block set on a smaller
+  one overhangs it; the bottom layer of each block now reports the share of its base that
+  rests on something instead of 1.0. The block solver also leaves a request that sets
+  `minimum_support_ratio`, and compressible items, to the per-item search.
+
 ## [1.4.0]
 
 Answers every request the way Packvium 1.4.0 does in the other languages, checked byte for

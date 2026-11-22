@@ -189,9 +189,15 @@ func SubtractAll(spaces []Space, boxes []domain.Box, stats *SearchStats) []Space
 	return out
 }
 
+// dominated reports whether another kept space contains kept[index]. kept is ordered by
+// origin z first, and a container starts at or below what it contains, so the scan stops at
+// the first space that starts higher: O(prefix) instead of O(s), with no index to build.
 func dominated(kept []carved, index int) bool {
-	mine := kept[index].space.box()
+	mine, z := kept[index].space.box(), kept[index].space.Origin.Z()
 	for other := range kept {
+		if kept[other].space.Origin.Z() > z {
+			return false
+		}
 		if other != index && kept[other].space.box().Contains(mine) {
 			return true
 		}

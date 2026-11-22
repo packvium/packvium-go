@@ -266,9 +266,8 @@ func (p *containerPlanner) plans(solver SingleContainerSolver, items []domain.It
 		var expansions []plan
 		for _, current := range beam {
 			if len(current.remaining) == 0 || int64(len(current.packed)) >= maximum {
-				if betterPlan(current, incumbent, cfg) {
-					incumbent = current
-				}
+				// Already weighed against the incumbent when it was created (below), and the
+				// incumbent only ever improves, so it cannot win now.
 				continue
 			}
 			for _, container := range ordered {

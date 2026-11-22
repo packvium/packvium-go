@@ -8,10 +8,11 @@
 // the engines return. The same document can be posted to any of them, or piped to the
 // command line, and the answer agrees byte for byte with every other engine's.
 //
-// The parser is strict about values and lenient about keys: a malformed number or an
-// unknown objective is refused, while an unknown key is read past. That is why the
-// misspelled field below changes nothing -- and why a field this engine does not implement
-// is refused by name instead of being ignored like a typo.
+// The parser is strict about values and about the configuration's keys: a malformed number,
+// an unknown objective or a misspelt configuration key is refused, while an unknown key on
+// an item is read past. That is why the misspelled item field below changes nothing -- and
+// why a field the schema reserves but this engine does not implement is refused by name
+// instead of being ignored like a typo.
 package main
 
 import (
@@ -27,9 +28,10 @@ import (
 
 type object = map[string]interface{}
 
-// time_limit_ms is a safety fuse, not a target: top_k asks the portfolio for runners-up, and
-// how many it finds is bounded by the wall clock unless a budget says otherwise, so without
-// it a loaded host could print a different number of alternatives.
+// alternatives asks for up to two complete answers: the winner and one runner-up.
+// time_limit_ms is a safety fuse far above what this solve needs, so it never decides the
+// answer: how many runners-up a clock-bounded search finds depends on how busy the host is.
+// examples/reproducibility shows what happens when it does.
 const requestJSON = `{
   "units": {"length": "mm"},
   "configuration": {
@@ -37,9 +39,9 @@ const requestJSON = `{
     "dimensional_weight_divisor": 5000,
     "dimensional_weight_length_unit": "cm",
     "dimensional_weight_weight_unit": "kg",
-    "profile": "balanced",
+    "solver_profile": "balanced",
     "seed": 42,
-    "top_k": 2,
+    "alternatives": 2,
     "time_limit_ms": 60000
   },
   "items": [
@@ -90,6 +92,8 @@ func main() {
 	fmt.Println("one placement, in full:")
 	fmt.Println(truncate(indentInWireOrder(first, ""), 400), "...")
 
+	// alternatives are real alternative arrangements, already scored and validated. The count
+	// includes the winner, so 2 means at most one runner-up, and an empty list is normal.
 	alternatives := result["alternatives"].([]interface{})
 	fmt.Println()
 	fmt.Println("alternatives:", len(alternatives))
@@ -123,18 +127,18 @@ func main() {
 		fmt.Println("unknown objective:", truncate(err.Error(), 100))
 	}
 
-	// A field the contract reserves before any engine implements it is refused by name too:
-	// container.pallet_overhang_limit is the one 1.1.0 reserves.
+	// A field the schema reserves but this engine has not implemented yet is refused by name,
+	// so a request written for a newer engine fails loudly instead of being half-honoured.
 	var refused interface{} = "none"
 	if unsupported := serialization.CurrentlyUnsupported; !unsupported.Empty() {
 		refused = refusedByScope(unsupported)
 	}
 	fmt.Println("fields this engine refuses by name:", refused)
 
-	behind := request()
-	behind["items"].([]interface{})[0].(object)["shape_type"] = "convex_hull"
-	if err := serialization.RejectUnsupported(behind, serialization.UnsupportedFields{ShapeTypes: []string{"convex_hull"}}); err != nil {
-		fmt.Println("  what one looks like, from an engine that is not:", truncate(err.Error(), 110))
+	ahead := request()
+	ahead["containers"].([]interface{})[0].(object)["pallet_overhang_limit"] = object{"length": "50", "width": "50"}
+	if _, err := serialization.Pack(ahead); err != nil {
+		fmt.Println("  sending one anyway:", truncate(err.Error(), 100))
 	}
 
 	fmt.Println()

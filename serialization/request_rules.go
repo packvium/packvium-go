@@ -236,6 +236,18 @@ var effortLimits = []string{"max_candidates_evaluated", "max_placement_attempts"
 
 var solverProfiles = []string{"fast", "balanced", "quality", "exact_small"}
 
+var objectives = []string{"default", "lowest_cost", "shipping_cost", "lowest_landed_cost", "open_dimension_height", "maximum_value"}
+
+var accessDirections = []string{"+x", "-x", "+y", "-y", "+z", "-z"}
+
+// configurationFields is every key the request schema's `configuration` declares; it sets
+// `additionalProperties: false`.
+var configurationFields = []string{"alternatives", "clearance", "container_plan_beam_width",
+	"container_plan_node_limit", "dimensional_weight_divisor", "dimensional_weight_length_unit",
+	"dimensional_weight_weight_unit", "effort_budget", "exact_item_limit", "max_candidate_points",
+	"max_candidates_per_item", "max_containers", "minimum_support_ratio", "multi_start_orders",
+	"objective", "require_placement_coordinates", "seed", "solver_profile", "solvers", "time_limit_ms"}
+
 var sides = []string{"length", "width", "height"}
 
 func checkUnits(raw interface{}) (string, error) {
@@ -265,7 +277,13 @@ func checkConfiguration(raw interface{}, unit string) error {
 		return err
 	}
 	where := "/configuration"
+	if err := knownFields(configuration, where, configurationFields); err != nil {
+		return err
+	}
 	if err := optional(configuration, "solver_profile", where, oneOf(solverProfiles)); err != nil {
+		return err
+	}
+	if err := optional(configuration, "objective", where, oneOf(objectives)); err != nil {
 		return err
 	}
 	for _, field := range configurationIntegers {
@@ -285,6 +303,9 @@ func checkConfiguration(raw interface{}, unit string) error {
 	}
 	budget, err := objectAt(effort, "/configuration/effort_budget")
 	if err != nil {
+		return err
+	}
+	if err := knownFields(budget, "/configuration/effort_budget", effortLimits); err != nil {
 		return err
 	}
 	for _, name := range effortLimits {
@@ -359,6 +380,7 @@ func checkContainer(raw interface{}, where, unit string) error {
 		{"tare_weight", measure(weightMeasure, weightUnit)}, {"max_payload", measure(weightMeasure, weightUnit)},
 		{"max_stack_density", measure(weightMeasure, weightUnit)}, {"max_items", atLeast(1)},
 		{"cost_minor", atLeast(0)}, {"void_fill_reserve_ratio", ratio(&one)},
+		{"access_directions", checkAccessDirections},
 		{"tag_limits", checkTagLimits}, {"rate_table", checkRateTable},
 		{"obstacles", func(value interface{}, field string) error { return checkObstacles(value, field, unit) }},
 	})
@@ -379,6 +401,36 @@ func dimensions(raw interface{}, where, unit string) error {
 		}
 	}
 	return nil
+}
+
+func checkAccessDirections(raw interface{}, where string) error {
+	values, err := listAt(raw, where)
+	if err != nil {
+		return err
+	}
+	for index, value := range values {
+		if err := oneOf(accessDirections)(value, where+domain.Pointer(strconv.Itoa(index))); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// knownFields refuses a key the schema does not name in a closed object, never ignoring it.
+// The first unknown key in code point order is named, the order every engine can share; Go
+// orders valid UTF-8 by bytes, which is code point order. O(k log k) for k keys.
+func knownFields(record map[string]interface{}, where string, known []string) error {
+	var unknown []string
+	for name := range record {
+		if !containsString(known, name) {
+			unknown = append(unknown, name)
+		}
+	}
+	if len(unknown) == 0 {
+		return nil
+	}
+	sort.Strings(unknown)
+	return refusal("not_allowed", where+domain.Pointer(unknown[0]), "is not a known field")
 }
 
 // checkTagLimits walks tags in code point order, as every engine does: a JavaScript object

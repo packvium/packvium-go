@@ -1,0 +1,28 @@
+
+==============================================================================
+1. As packed: as few pallets as possible, the first one full
+==============================================================================
+  pallet#1 294 kg (21 items), pallet#2 120 kg (5 items)
+
+==============================================================================
+2. Rebalanced
+==============================================================================
+  moved paint-20l#6 from pallet#1 to pallet#2
+  moved paint-20l#5 from pallet#1 to pallet#2
+  moved paint-20l#13 from pallet#1 to pallet#2
+  moved paint-20l#1 from pallet#1 to pallet#2
+  pallet#1 198 kg (17 items), pallet#2 216 kg (9 items)
+  still a valid packing: True
+
+  Heavy items move first, because each one narrows the gap most. The paint stays
+  upright in its new place and nothing is left resting on a gap where a moved can
+  used to be -- a move that would do that is rejected, not made.
+
+==============================================================================
+3. When there is nothing to improve
+==============================================================================
+  pallet#1 30 kg (10 items)  improved: False
+
+  One pallet has nothing to balance against, and the result says so rather than
+  inventing a second pallet. The same holds when every candidate move would break a
+  rule: `moves` is empty and the packing comes back as it was.

@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// The Python examples' output at v1.4.0, kept beside the programs so the test runs wherever
+// The Python examples' output at v1.5.0, kept beside the programs so the test runs wherever
 // the module does, with no checkout of the suite repository.
 const referenceDirectory = "testdata"
 
@@ -31,9 +31,9 @@ var languageWording = map[string]map[string]string{
 		"the full result as a plain map is what examples/serialization explores:": "the full result as a plain dict is what serialization.py explores:",
 	},
 	"serialization": {
-		"  what one looks like, from an engine that is not: unsupported_feature: the Go engine does not yet implement item.shape_type=convex_hull; the request was rejecte": "  what one looks like, from an engine that is not: unsupported_feature: the Python engine does not yet implement item.shape_type=convex_hull; the request was rej",
-		"fields this engine refuses by name: map[container:[pallet_overhang_limit]]":                                                                                        "fields this engine refuses by name: {'container': ('pallet_overhang_limit',)}",
-		"the CLI takes exactly the document above:  echo '...' | go run ./cmd/packvium":                                                                                     "the CLI takes exactly the document above:  echo '...' | python3 -m packvium",
+		"  sending one anyway: unsupported_feature: the Go engine does not yet implement container.pallet_overhang_limit; the reque": "  sending one anyway: unsupported_feature: the Python engine does not yet implement container.pallet_overhang_limit; the r",
+		"fields this engine refuses by name: map[container:[pallet_overhang_limit]]":                                                 "fields this engine refuses by name: {'container': ('pallet_overhang_limit',)}",
+		"the CLI takes exactly the document above:  echo '...' | go run ./cmd/packvium":                                              "the CLI takes exactly the document above:  echo '...' | python3 -m packvium",
 	},
 	"extensions": {
 		"rule everyone must obey belongs in the request as data, not in a type.": "rule everyone must obey belongs in the request as data, not in a class.",
@@ -56,6 +56,18 @@ var languageWording = map[string]map[string]string{
 		"  preserved: true":                      "  preserved: True",
 		"  the approved plan is untouched: true": "  the approved plan is untouched: True",
 		"  a lock the solve cannot honour -> preserved=false, 1 lock reported back": "  a lock the solve cannot honour -> preserved=False, 1 lock reported back",
+	},
+	"errors": {
+		"  Both are errors, so a handler that ends with a plain `err != nil` still turns":     "  Both are `ValueError`s, so a handler that ends with `except ValueError` still turns",
+		"  them into a 422 -- but they have no Reason or Field to highlight, only a message.": "  them into a 422 -- but they have no `reason` or `field` to highlight, only a message.",
+	},
+	"rebalancing": {
+		"  still a valid packing: true":                                  "  still a valid packing: True",
+		"  pallet#1 30 kg (10 items)  improved: false":                   "  pallet#1 30 kg (10 items)  improved: False",
+		"  rule: `Moves` is empty and the packing comes back as it was.": "  rule: `moves` is empty and the packing comes back as it was.",
+	},
+	"reproducibility": {
+		"  `time_limit`, and `ReplayLevel` refuses to promise a replay.": "  `time_limit`, and `replay_level` refuses to promise a replay.",
 	},
 	"revisions": {
 		"  revision 0, parent nil": "  revision 0, parent None",

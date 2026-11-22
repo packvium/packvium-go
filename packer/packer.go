@@ -60,7 +60,7 @@ func (p *Packer) PackWithFixedPlacements(items []*domain.Item, containers []*dom
 		return nil, err
 	}
 	request = request.WithFixedPlacements(fixed)
-	if err := p.refuseUnpriceableObjectives(request); err != nil {
+	if err := refuseUnpriceableObjectives(p.cfg, request); err != nil {
 		return nil, err
 	}
 	load, err := admitFixedPlacements(request, p.cfg.MinimumSupportRatio(), p.cfg.Clearance(), p.cfg.MaxContainers())
@@ -99,9 +99,7 @@ func (p *Packer) PackWithFixedPlacements(items []*domain.Item, containers []*dom
 	}
 	best := selected[0]
 	if unpriceable := algorithm.UnpriceableContainer(best.Containers, p.cfg); unpriceable != nil {
-		return nil, &UnratedWeightError{fmt.Sprintf(
-			"container '%s' bills at %d g, above its rate table's last bracket (%d g); the shipment has no published price",
-			unpriceable.ContainerID, unpriceable.BilledGrams, unpriceable.LastBracketG)}
+		return nil, unratedWeight(unpriceable)
 	}
 	// The unpriceable sentinel is a search device, never an answer, for runner-ups too: filter
 	// before slicing to top-k.
@@ -143,10 +141,10 @@ func sortResults(ranked []*result.PackingResult) []*result.PackingResult {
 // refuseUnpriceableObjectives refuses, before any solver runs, a cost objective without a
 // divisor and a landed-cost objective over a container without a tariff: both are static
 // properties of the request. There is no library-chosen default divisor.
-func (p *Packer) refuseUnpriceableObjectives(request *domain.PackingRequest) error {
-	objective := p.cfg.Objective()
+func refuseUnpriceableObjectives(cfg *config.PackingConfig, request *domain.PackingRequest) error {
+	objective := cfg.Objective()
 	priced := objective == "shipping_cost" || objective == algorithm.LandedCostObjective
-	if priced && p.cfg.DimensionalWeightDivisor() == nil {
+	if priced && cfg.DimensionalWeightDivisor() == nil {
 		return &algorithm.UnknownObjectiveError{Message: "the " + objective +
 			" objective requires configuration.dimensional_weight_divisor"}
 	}
@@ -160,6 +158,13 @@ func (p *Packer) refuseUnpriceableObjectives(request *domain.PackingRequest) err
 		}
 	}
 	return nil
+}
+
+// unratedWeight refuses a finished answer whose billed weight its tariff cannot price.
+func unratedWeight(unpriceable *algorithm.Unpriceable) error {
+	return &UnratedWeightError{fmt.Sprintf(
+		"container '%s' bills at %d g, above its rate table's last bracket (%d g); the shipment has no published price",
+		unpriceable.ContainerID, unpriceable.BilledGrams, unpriceable.LastBracketG)}
 }
 
 func (p *Packer) rank(raw algorithm.RawSolution, request *domain.PackingRequest, records []result.StartRecord,

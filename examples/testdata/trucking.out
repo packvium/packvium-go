@@ -1,0 +1,68 @@
+
+==============================================================================
+1. The plan: nothing for a later stop stands in an earlier stop's way out
+==============================================================================
+  status: feasible, left behind: 0
+    stop 2  parcel#5             x=     0 mm  y=     0 mm
+    stop 0  bakery-rack#1        x=     0 mm  y=  1200 mm
+    stop 2  parcel#4             x=   400 mm  y=   600 mm
+    stop 2  parcel#2             x=   800 mm  y=   600 mm
+    stop 0  bakery-rack#2        x=   800 mm  y=  1200 mm
+    stop 2  parcel#6             x=  1200 mm  y=   600 mm
+    stop 2  dry-goods-pallet#1   x=  1600 mm  y=     0 mm
+    stop 2  parcel#1             x=  2400 mm  y=     0 mm
+    stop 1  drinks-pallet#1      x=  3000 mm  y=     0 mm
+    stop 2  parcel#3             x=  3000 mm  y=   800 mm
+
+  x is the distance from the bulkhead, so the rear doors are at x = 4200 mm. The
+  bakery racks sit at the front, but the aisle beside them runs clear to the doors:
+  the rule is that nothing due later blocks every way out, not that stop 0 is last in.
+
+==============================================================================
+2. Axle loads against their ratings
+==============================================================================
+  payload: 968 kg of 1300 kg allowed
+  front axle: 1519.4 kg of 1650 kg
+  rear axle:  1848.6 kg of 2200 kg
+
+  the same load with a 1450 kg front axle rating:
+    left behind: drinks-pallet#1, reason no_feasible_placement (observed)
+
+  The axle rule refuses a placement rather than reporting an overload afterwards.
+  Note the reason: an item the axles cannot carry is reported as the generic
+  `no_feasible_placement`, not as an axle problem, so when a load comes up short on
+  a vehicle with axle ratings, check the reactions before shopping for a bigger van.
+
+==============================================================================
+3. Unloading order along the route, and the loading order it implies
+==============================================================================
+    off  1: stop 0  bakery-rack#2
+    off  2: stop 0  bakery-rack#1
+    off  3: stop 1  drinks-pallet#1
+    off  4: stop 2  parcel#1
+    off  5: stop 2  parcel#3
+    off  6: stop 2  dry-goods-pallet#1
+    off  7: stop 2  parcel#5
+    off  8: stop 2  parcel#6
+    off  9: stop 2  parcel#2
+    off 10: stop 2  parcel#4
+
+  load in this order: parcel#4, parcel#2, parcel#6, parcel#5, dry-goods-pallet#1, parcel#3, parcel#1, drinks-pallet#1, bakery-rack#1, bakery-rack#2
+
+==============================================================================
+4. What the driver can reach on opening the doors at stop 0
+==============================================================================
+    bakery-rack#1: reachable=False, behind bakery-rack#2
+    bakery-rack#2: reachable=True
+
+  Reachability is a snapshot, not a plan: one rack is behind the other, which is
+  fine because both are for this stop and the first one comes off first.
+
+==============================================================================
+5. The same goods without `stop_index`
+==============================================================================
+  status feasible, every item packed -- and at stop 0 the driver cannot get these out: bakery-rack#1, bakery-rack#2
+
+  Without the route the plan is still a valid packing, and still within the axle
+  ratings; it just cannot be delivered in order. The route is only enforced when
+  you state it.

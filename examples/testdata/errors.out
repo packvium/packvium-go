@@ -1,0 +1,57 @@
+
+==============================================================================
+1. Refused before solving: one reason, one pointer, one message
+==============================================================================
+  a valid order
+    HTTP 200  {"status": "feasible", "boxes": 1, "left_out": []}
+  quantity 0
+    HTTP 422  {"code": "invalid_request", "reason": "below_minimum", "field": "/items/0/quantity", "message": "Please check item \"mug\", quantity: must be at least 1."}
+  a negative width
+    HTTP 422  {"code": "invalid_request", "reason": "negative_measure", "field": "/items/1/dimensions/width", "message": "Please check item \"teapot\", dimensions/width: cannot be negative."}
+  a missing height
+    HTTP 422  {"code": "invalid_request", "reason": "missing_field", "field": "/items/1/dimensions/height", "message": "Please check item \"teapot\", dimensions/height: is required."}
+  a float where a measure belongs
+    HTTP 422  {"code": "invalid_request", "reason": "wrong_type", "field": "/items/1/dimensions/width", "message": "Please check item \"teapot\", dimensions/width: must be a measure."}
+  the same container id twice
+    HTTP 422  {"code": "invalid_request", "reason": "duplicate_id", "field": "/containers/1/id", "message": "Please check container \"box\", id: repeats the id \"box\"."}
+  an unknown solver profile
+    HTTP 422  {"code": "invalid_request", "reason": "not_allowed", "field": "/configuration/solver_profile", "message": "Please check /configuration/solver_profile: must be one of [\"fast\",\"balanced\",\"quality\",\"exact_small\"]."}
+
+  A float is refused as a measure on purpose: binary floating point cannot hold most
+  decimal lengths exactly, and every length here is exact. Send "160.5" as a string.
+  When several values are wrong, the first is reported, in a fixed order every
+  engine shares: units, configuration, items, containers, fixed placements.
+
+==============================================================================
+2. Items already in place that cannot be there
+==============================================================================
+  a teapot already in the box, packed around
+    HTTP 200  {"status": "feasible", "boxes": 1, "left_out": []}
+  a teapot recorded at x = 200 mm, hanging out of a 300 mm box
+    HTTP 422  {"code": "invalid_fixed_placement", "reason": "cannot_hold", "field": "/fixed_placements", "message": "The items already loaded cannot stay as recorded: outside_container: teapot#1."}
+  a mug and the teapot recorded in the same place
+    HTTP 422  {"code": "invalid_fixed_placement", "reason": "cannot_hold", "field": "/fixed_placements", "message": "The items already loaded cannot stay as recorded: collision: teapot#1 with mug#1."}
+  an orientation code that does not exist
+    HTTP 422  {"code": "invalid_fixed_placement", "reason": "malformed", "field": "/fixed_placements/0/orientation", "message": "The items already loaded cannot stay as recorded: fixed_placements[0].orientation is one of the six codes."}
+
+  `cannot_hold` means the fixed set is well formed but is not a valid packing on its
+  own, and `field` is the whole list. `malformed` points at the one bad value.
+
+==============================================================================
+3. Not an error: a valid order that does not fit
+==============================================================================
+  a teapot too tall for any box
+    HTTP 200  {"status": "best_found", "boxes": 1, "left_out": ["teapot#1"]}
+
+  The caller asked a fair question and got an answer: the rest of the order is
+  packed, and `unpacked_items` says what is not and why. Retrying it will not help,
+  and neither will treating it as a 4xx.
+
+==============================================================================
+4. Two refusals that do not carry a pointer
+==============================================================================
+  an unknown objective: InvalidRequestError
+  an unknown door: InvalidRequestError
+
+  Both are `ValueError`s, so a handler that ends with `except ValueError` still turns
+  them into a 422 -- but they have no `reason` or `field` to highlight, only a message.

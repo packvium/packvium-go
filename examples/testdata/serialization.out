@@ -34,14 +34,13 @@ one placement, in full:
     },
     ...
 
-alternatives: 2
+alternatives: 1
    score [0, 1337, 1, 743600, 560000] first two placements [('mug#2', '0'), ('book#4', '100')]
-   score [0, 1337, 1, 743600, 560000] first two placements [('book#1', '0'), ('mug#1', '140')]
 
 misspelled field: feasible -- accepted; the misspelling is invisible to the parser,
                   so `keep_upright` was never applied to the mug
-unknown objective: unknown objective 'cheapest'; expected one of ['default', 'lowest_cost', 'lowest_landed_cost', 'maxi
+unknown objective: invalid_request: /configuration/objective: must be one of ["default","lowest_cost","shipping_cost","
 fields this engine refuses by name: {'container': ('pallet_overhang_limit',)}
-  what one looks like, from an engine that is not: unsupported_feature: the Python engine does not yet implement item.shape_type=convex_hull; the request was rej
+  sending one anyway: unsupported_feature: the Python engine does not yet implement container.pallet_overhang_limit; the r
 
 the CLI takes exactly the document above:  echo '...' | python3 -m packvium

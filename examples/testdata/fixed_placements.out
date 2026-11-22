@@ -1,0 +1,36 @@
+
+==============================================================================
+1. Packed around the pallets already on board
+==============================================================================
+  status feasible, payload 8400 kg, left out 0
+  already on board, unmoved: returns-pallet#1, returns-pallet#2, returns-pallet#3, returns-pallet#4
+  added: 14 store pallets
+
+  The returns pallets keep their ids, positions and orientations. They took the
+  first four instances of `returns-pallet`, so none are left for the engine to
+  place; ask for five and it would place one more.
+
+==============================================================================
+2. One pallet was left in the middle of the floor
+==============================================================================
+  status feasible, payload 8400 kg, left out 0
+  already on board, unmoved: returns-pallet#1, returns-pallet#2, returns-pallet#3, returns-pallet#4
+  added: 14 store pallets
+    store-pallet#1 is stacked, at z = 1100 mm
+
+  The fourth returns pallet stands 400 mm off the side wall, and no pallet fits in
+  the strip it leaves. The plan still takes all fourteen store pallets, but it has
+  to put one on top of another to do it. Whether that is acceptable is
+  your call; the plan shows you the price of not moving that pallet.
+
+==============================================================================
+3. What is on board cannot be where the record says
+==============================================================================
+  two pallets recorded in the same place:
+    cannot_hold, /fixed_placements: invalid_fixed_placement: collision: returns-pallet#1 with returns-pallet#4
+  a 1000 kg trailer limit, already exceeded by the returns:
+    cannot_hold, /fixed_placements: invalid_fixed_placement: payload_exceeded: trailer#1
+
+  Nothing is solved when the starting point is impossible: a plan built on a
+  collision or an overweight trailer would be wrong before the first pallet moved.
+  `cannot_hold` names the fixed set as a whole; the detail says what is wrong.

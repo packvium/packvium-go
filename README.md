@@ -8,8 +8,8 @@ over another one. It accepts the same requests and returns the same results as t
 PHP, Java and .NET engines. Its tests run the shared conformance corpus, and every result
 matches the reference result byte for byte.
 
-> **Version 1.4.0.** This release corresponds to Packvium 1.4.0 in the other languages, and
-> its tests run the 1.4.0 conformance corpus: every packing fixture, every commerce case, the
+> **Version 1.5.0.** This release corresponds to Packvium 1.5.0 in the other languages, and
+> its tests run the 1.5.0 conformance corpus: every packing fixture, every commerce case, the
 > execution plan of every golden result and its operational artifact, every structured request
 > error and every plan-revision case. Field names, status codes and the objective vector stay
 > the same for all of 1.x.
@@ -26,6 +26,7 @@ matches the reference result byte for byte.
 - [Operator locks](#operator-locks)
 - [Operational artifacts](#operational-artifacts)
 - [Fixed placements and plan revisions](#fixed-placements-and-plan-revisions)
+- [Weight rebalancing](#weight-rebalancing)
 - [Scenarios, recommendations and holdout replay](#scenarios-recommendations-and-holdout-replay)
 - [Examples](#examples)
 - [Command line](#command-line)
@@ -37,7 +38,7 @@ matches the reference result byte for byte.
 ## Install
 
 ```bash
-go get github.com/packvium/packvium-go@v1.4.0
+go get github.com/packvium/packvium-go@v1.5.0
 ```
 
 Go 1.13 or newer. The module is checked on a real Go 1.13 toolchain, so projects that
@@ -156,6 +157,33 @@ if refusal, ok := err.(*domain.InvalidRequestError); ok {
 	fmt.Println(refusal.Reason, refusal.Field) // below_minimum /items/0/quantity
 }
 ```
+
+The request schema closes `configuration` and its `effort_budget`, and so does the engine: a
+key they do not declare is refused with reason `not_allowed` and its own pointer, never
+ignored, so a misspelt `profile` for `solver_profile` or `top_k` for `alternatives` no longer
+runs on defaults. When several keys are unknown, the first in code point order is named.
+`parallel` is refused the same way: running starts concurrently is an execution setting, not
+part of the request. An unknown `objective`, or an `access_directions` entry that is not one of
+the six walls, is `not_allowed` with its pointer too.
+
+```go
+_, err = serialization.Pack(map[string]interface{}{
+	"configuration": map[string]interface{}{"profile": "balanced"},
+	"items":         []interface{}{},
+	"containers":    []interface{}{},
+})
+var refusal *domain.InvalidRequestError
+if errors.As(err, &refusal) {
+	fmt.Println(refusal.Reason, refusal.Field) // not_allowed /configuration/profile
+	fmt.Println(refusal)                       // invalid_request: /configuration/profile: is not a known field
+}
+```
+
+The other refusals keep their own types: `*serialization.UnsupportedFeatureError`,
+`*algorithm.UnknownSolverError`, `*algorithm.UnknownObjectiveError` (a cost objective
+without the divisor it needs) and `*policy.PolicyError`.
+[`examples/errors`](examples/errors) turns each kind into the response a web handler
+would send.
 
 A request that sets a field no engine implements yet (`container.pallet_overhang_limit`) is
 refused with `unsupported_feature` rather than answered as though the field were absent.
@@ -309,7 +337,9 @@ a different one. `artifacts.Parse` and `artifacts.FromJSON` read JSON text with 
 exact; decode with them rather than with `encoding/json` alone, which turns an escaped lone
 surrogate (`"\ud800"`) into U+FFFD where the other engines refuse it. Exports read the
 artifact through its canonical bytes, so a `float64` `1.0` prints as the `1` every other
-engine reads back. [`examples/artifacts`](examples/artifacts) builds and exports one.
+engine reads back. `artifacts.ReplayLevel(result)` answers `exact` or `not_guaranteed`, the
+promise an artifact of that result would make, without building one.
+[`examples/artifacts`](examples/artifacts) builds and exports one.
 
 ## Fixed placements and plan revisions
 
@@ -344,6 +374,32 @@ package calls no solver, validator or clock. `intelligence/revisionoutcomes` tur
 revision's events into outcome-ledger events, so what happened on the dock becomes evidence
 for the historical evaluation. [`examples/revisions`](examples/revisions) replans a
 half-loaded job.
+
+## Weight rebalancing
+
+The packer opens as few containers as it can and fills the first one tightly. When the
+containers should weigh about the same -- two pallets on a forklift -- run
+`packer.RebalanceWeight` on the finished packing. It moves one item at a time from the
+heaviest container to a lighter one, and keeps a move only when the item has a real place in
+its new container and the whole packing still passes the independent validator: it never
+adds a container, drops an item or leaves one resting on a gap, and fixed placements stay
+where they are. It stops when no single move narrows the gap, after `MaxMoves` (64 by
+default) or at `TimeLimitMS`; it is greedy, so the split is better, not necessarily the most
+even one possible.
+
+```go
+result, err := packer.New(cfg, nil).Pack(items, pallets)
+request, err := domain.NewPackingRequest(items, pallets)
+rebalanced, err := packer.RebalanceWeight(request, result.Containers, result.Unpacked, cfg,
+	packer.DefaultRebalanceOptions())
+for _, move := range rebalanced.Moves {
+	fmt.Println(move.ItemID, move.FromContainerID, "->", move.ToContainerID) // paint-20l#6 pallet#1 -> pallet#2
+}
+```
+
+Under a landed-cost objective it refuses what `Pack` refuses, and never makes a move that
+prices a container past its rate table. [`examples/rebalancing`](examples/rebalancing) evens
+out two pallets.
 
 ## Scenarios, recommendations and holdout replay
 
@@ -415,6 +471,12 @@ where Python names its own; `go test ./examples/` checks that, line by line.
 | [`execution`](examples/execution) | Turn a result into a work order, then pin a box with an operator lock and see both ways a lock can fail. | `go run ./examples/execution` |
 | [`revisions`](examples/revisions) | Replan a half-loaded job: keep a loaded box where it is, record a missing item against the approved plan, and audit the chain. | `go run ./examples/revisions` |
 | [`intelligence`](examples/intelligence) | Compare two carton sets order by order, propose the change, and replay it against history it has not seen. | `go run ./examples/intelligence` |
+| [`errors`](examples/errors) | Turn a refused request into a useful answer, the way a web handler would: one reason, one pointer, one message. | `go run ./examples/errors` |
+| [`fixed_placements`](examples/fixed_placements) | Pack a trailer that is already partly loaded, and what happens when the record of what is on board is impossible. | `go run ./examples/fixed_placements` |
+| [`limits`](examples/limits) | Obstacles, item caps, tag limits, eligible containers and a fleet cap on a courier's van and bikes. | `go run ./examples/limits` |
+| [`rebalancing`](examples/rebalancing) | Even out the weight across pallets after packing. | `go run ./examples/rebalancing` |
+| [`reproducibility`](examples/reproducibility) | The same answer on every machine: an effort budget against a wall-clock limit. | `go run ./examples/reproducibility` |
+| [`trucking`](examples/trucking) | A delivery van with axle ratings, rear doors and a three-stop route, and the loading order a driver follows. | `go run ./examples/trucking` |
 
 Run them from the module root.
 
@@ -467,8 +529,8 @@ shows up in the conformance corpus:
 
 ## Versions and milestones
 
-The module's versions follow the Packvium releases: 1.4.0 here answers every request the way
-Packvium 1.4.0 does in the other languages. Within 1.x, field names, status codes and the
+The module's versions follow the Packvium releases: 1.5.0 here answers every request the way
+Packvium 1.5.0 does in the other languages. Within 1.x, field names, status codes and the
 objective vector do not change. What each release added is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Testing

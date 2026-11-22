@@ -286,6 +286,23 @@ func TestAResultThatDoesNotSayHowItWasSolvedIsNotPromisedOneEither(t *testing.T)
 	}
 }
 
+func TestReplayLevelIsThePromiseTheArtifactWouldMake(t *testing.T) {
+	stopped := testResult()
+	stopped["algorithm"].(map[string]interface{})["time_limit_reached"] = true
+	unsolved := testResult()
+	unsolved["algorithm"] = nil
+	for _, result := range []map[string]interface{}{testResult(), stopped, unsolved} {
+		expected := mustBuild(t, testRequest(), result, nil)["provenance"].(map[string]interface{})["replay"].(map[string]interface{})["level"]
+		level, err := ReplayLevel(result)
+		if err != nil || level != expected {
+			t.Fatalf("replay level %q (%v), artifact says %v", level, err, expected)
+		}
+	}
+	if level, _ := ReplayLevel(testResult()); level != "exact" {
+		t.Fatalf("replay level %q", level)
+	}
+}
+
 // -------------------------------------------------------------------------------- refusals
 
 func TestARefusalNamesItsCode(t *testing.T) {
@@ -601,7 +618,7 @@ func TestTheWorkOrderIsTheReferencePage(t *testing.T) {
 		"<tr><td>Replay</td><td>exact</td></tr>",
 		"<tr><td>Solver</td><td>balanced / extreme_point / seed 7</td></tr>",
 		"<tr><td>Catalogs</td><td>cartons v3</td></tr>",
-		"<tr><td>Packvium</td><td>1.4.0</td></tr>",
+		"<tr><td>Packvium</td><td>1.5.0</td></tr>",
 		"</table>",
 		`<section class="container">`,
 		"<h2>Container 1: crate</h2>",

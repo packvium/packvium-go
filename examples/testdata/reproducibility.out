@@ -1,0 +1,50 @@
+
+==============================================================================
+1. A clock-limited search answers differently on different machines
+==============================================================================
+  fast host    medium left out  8  termination time_limit   replay not_guaranteed
+  busy host    small  left out 14  termination time_limit   replay not_guaranteed
+  slower host  small  left out 19  termination time_limit   replay not_guaranteed
+  overloaded   small  left out 21  termination time_limit   replay not_guaranteed
+
+  Same request, four answers. Each is a valid packing of what the search reached
+  before the clock ran out, and the items it never reached are listed as left out,
+  but none can be reproduced: run it again on a different day and you get whichever
+  one the machine allows. `termination` says
+  `time_limit`, and `replay_level` refuses to promise a replay.
+
+==============================================================================
+2. An effort budget answers the same everywhere
+==============================================================================
+  fast host    large  left out  0  termination complete     replay exact
+  slower host  large  left out  0  termination complete     replay exact
+  overloaded   large  left out  0  termination complete     replay exact
+
+  The budget is large enough that the search finishes, so `termination` is
+  `complete`, and it would stop at the same count on any machine if it were not.
+
+==============================================================================
+3. A budget that is too small is still reproducible, and says so
+==============================================================================
+  fast host    large  left out  3  termination effort_limit replay exact
+  overloaded   large  left out  3  termination effort_limit replay exact
+
+  The search stopped early and left items out -- `termination` is `effort_limit`,
+  not `complete` -- but it stopped at the same point on both hosts, so the answer
+  can be replayed exactly. Raise the budget until the answer is good enough, then
+  keep it fixed.
+
+==============================================================================
+4. Reading `termination`
+==============================================================================
+  code: complete
+    extreme_points:volume        completed=True   <- selected
+    extreme_points:base_area     completed=True
+    extreme_points:seeded_2      completed=True
+    extreme_points:seeded_3      completed=True
+
+  `max_restarts` caps how many portfolio starts run -- here four -- which bounds the
+  work of a large request as well as fixing it. `code` describes the selected start:
+  a losing start that was cut short leaves it `complete`, and shows up in its own
+  record and in `all_required_starts_completed` instead. Over JSON, the same budget
+  is `configuration.effort_budget`.

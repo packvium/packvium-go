@@ -32,7 +32,7 @@ const Format = "packvium-operational-artifact/v1"
 // SuiteVersion is the suite version of this builder, the same string in every engine of one
 // release. The engine's own name is deliberately not recorded: correct builders naming
 // themselves would emit different documents.
-const SuiteVersion = "1.4.0"
+const SuiteVersion = "1.5.0"
 
 // SolverFields are the deterministic part of result.algorithm. duration_ms is wall-clock time
 // and never enters an artifact.
@@ -215,6 +215,17 @@ func buildSolver(algorithm interface{}) (map[string]interface{}, error) {
 		solver[name] = fields[name]
 	}
 	return solver, nil
+}
+
+// ReplayLevel is "exact" or "not_guaranteed": the replay promise an artifact of result would
+// make, without building the artifact. A malformed result.algorithm is refused as Build
+// refuses it.
+func ReplayLevel(result map[string]interface{}) (string, error) {
+	solver, err := buildSolver(result["algorithm"])
+	if err != nil {
+		return "", err
+	}
+	return replay(solver)["level"].(string), nil
 }
 
 // replay is "exact" only when a replay must reproduce the result. A search stopped by
