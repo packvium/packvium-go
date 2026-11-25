@@ -236,8 +236,7 @@ func (i *Item) StackingGroup() *string            { return copyString(i.spec.Sta
 // unconstrained.
 func (i *Item) AcceptsStackingGroups() TagSet { return i.carries }
 
-// CarriesItself reports whether a column of this one item type passes every stacking edge
-//.
+// CarriesItself reports whether a column of this one item type passes every stacking edge.
 func (i *Item) CarriesItself() bool {
 	return i.spec.Stackable && (i.carries.Len() == 0 ||
 		(i.spec.StackingGroup != nil && i.carries.Has(*i.spec.StackingGroup)))

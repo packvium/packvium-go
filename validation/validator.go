@@ -177,8 +177,8 @@ func bagAdmits(container *domain.Container, placements []domain.Placement) bool 
 	return domain.GirthAdmits(container.InnerDimensions(), extent[0], extent[1], extent[2])
 }
 
-// madeToMeasureIssues holds every made-to-measure box to the one its placements call for
-//: containment was checked like any container's, and this re-cuts the box from the
+// madeToMeasureIssues holds every made-to-measure box to the one its placements call for:
+// containment was checked like any container's, and this re-cuts the box from the
 // declared machine and the achieved extent, so a trial committed with a stale or mixed-up box
 // is caught. O(p) per container.
 func madeToMeasureIssues(request *domain.PackingRequest, containers []*domain.PackedContainer) []ValidationIssue {
