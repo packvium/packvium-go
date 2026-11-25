@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 
 	"github.com/packvium/packvium-go/internal/ints"
@@ -145,6 +146,12 @@ type ContainerSpec struct {
 	// doors would be a different nearly-vacuous rule and would change answers for every
 	// caller who never set the field.
 	AccessDirections []string
+	// DeformableBoundary "flat_bag" makes this a flexible bag whose package conforms to its
+	// contents; empty is a rigid container.
+	DeformableBoundary string
+	// MadeToMeasure cuts the container to measure on an on-demand box machine whose largest
+	// box is InnerDimensions. A packed result carries the fabricated box instead.
+	MadeToMeasure *MadeToMeasure
 }
 
 // Container is one validated, immutable container type.
@@ -155,7 +162,7 @@ type Container struct {
 	// preloaded are items already in this one container instance before search starts. Only
 	// the orchestrator sets them, on the instance a request's fixed placements name, so every
 	// solver's state starts from them without knowing they exist; base is the request's own
-	// container, which a packed result carries instead (docs/PLAN-REVISIONS.md).
+	// container, which a packed result carries instead.
 	preloaded []Placement
 	base      *Container
 }
@@ -184,6 +191,18 @@ func validateContainer(spec ContainerSpec) error {
 	switch {
 	case spec.ID == "":
 		return errors.New("container id is required")
+	}
+	if spec.DeformableBoundary != "" {
+		if err := requireBagFields(spec); err != nil {
+			return err
+		}
+	}
+	if spec.MadeToMeasure != nil {
+		if err := spec.MadeToMeasure.admits(Triple(spec.InnerDimensions)); err != nil {
+			return err
+		}
+	}
+	switch {
 	case spec.Quantity != nil && *spec.Quantity <= 0:
 		return errors.New("container quantity must be positive")
 	case spec.CostMinor < 0:
@@ -219,6 +238,28 @@ func validateContainer(spec ContainerSpec) error {
 	return nil
 }
 
+// requireBagFields refuses the wall-anchored fields a bag has no walls, floor plan or chassis
+// for, in the reference's order.
+func requireBagFields(spec ContainerSpec) error {
+	if spec.DeformableBoundary != FlatBag {
+		return fmt.Errorf("unknown deformable_boundary kind '%s'", spec.DeformableBoundary)
+	}
+	refused := []struct {
+		name    string
+		present bool
+	}{
+		{"obstacles", len(spec.Obstacles) > 0}, {"axles", spec.Axles != nil},
+		{"access_directions", len(spec.AccessDirections) > 0}, {"max_stack_density", spec.MaxStackDensity != nil},
+		{"outer_dimensions", spec.OuterDimensions != nil}, {"void_fill_reserve_ratio", spec.VoidFillReserveRatio > 0},
+	}
+	for _, field := range refused {
+		if field.present {
+			return fmt.Errorf("%s cannot be combined with deformable_boundary", field.name)
+		}
+	}
+	return nil
+}
+
 func validateAxles(spec ContainerSpec) error {
 	if spec.Axles == nil {
 		return nil
@@ -248,6 +289,53 @@ func (c *Container) VoidFillReserveRatio() float64  { return c.spec.VoidFillRese
 func (c *Container) Metadata() interface{}          { return c.spec.Metadata }
 func (c *Container) MaxStackDensity() *units.Weight { return copyWeight(c.spec.MaxStackDensity) }
 func (c *Container) Axles() *[2]Axle                { return copyAxles(c.spec.Axles) }
+
+// IsFlatBag reports whether the container is a flat bag.
+func (c *Container) IsFlatBag() bool { return c.spec.DeformableBoundary != "" }
+
+// DeformableBoundary is the boundary kind, empty for a rigid container.
+func (c *Container) DeformableBoundary() string { return c.spec.DeformableBoundary }
+
+// MadeToMeasure is the box machine, or nil for a declared container.
+func (c *Container) MadeToMeasure() *MadeToMeasure { return c.spec.MadeToMeasure }
+
+// WithEnvelope is this machine's container solved inside one rung: same id, everything else
+// unchanged. O(1).
+func (c *Container) WithEnvelope(rung [3]int64) *Container {
+	solved := *c
+	solved.spec.InnerDimensions = MustDimensions(rung[0], rung[1], rung[2])
+	return &solved
+}
+
+// Fabricate is the box cut for an achieved extent: this container with its size, outer size,
+// price and tare replaced. Every placement lies inside achieved and grid never rounds below it
+// or past the maximum, so containment needs no check. O(1).
+func (c *Container) Fabricate(achieved [3]int64) *Container {
+	machine := c.spec.MadeToMeasure
+	var sides, outer [3]int64
+	for axis := range sides {
+		sides[axis] = machine.grid(axis, achieved[axis])
+		outer[axis] = sides[axis] + machine.outerAllowance[axis]
+	}
+	area := SurfaceArea(sides)
+	cost := BoxCostMinorFor(machine.costPerSquareMetreMinor, c.spec.CostMinor, sides)
+	tare := PerSquareMetre(machine.tarePerSquareMetre, area)
+	tare.Add(tare, big.NewInt(c.spec.TareWeight.Ticks()))
+	fabricated := *c
+	fabricated.spec.InnerDimensions = MustDimensions(sides[0], sides[1], sides[2])
+	outerDimensions := MustDimensions(outer[0], outer[1], outer[2])
+	fabricated.spec.OuterDimensions = &outerDimensions
+	fabricated.spec.CostMinor = exactInt64(cost)
+	fabricated.spec.TareWeight = units.MustWeight(exactInt64(tare))
+	return &fabricated
+}
+
+func exactInt64(value *big.Int) int64 {
+	if !value.IsInt64() {
+		panic(ints.Overflow{Operation: "narrowing"})
+	}
+	return value.Int64()
+}
 
 // AccessDirections are the container's doors in canonical order; empty when none are stated.
 func (c *Container) AccessDirections() []string {

@@ -106,7 +106,7 @@ func show(result object) {
 	}
 }
 
-// sortedKeys orders keys as the reference sorts its tuples: NUL joins the parts, and it sorts
+// sortedKeys orders keys as Python sorts tuples, the order the shared output uses: NUL joins the parts, and it sorts
 // before every character an id or a reason contains.
 func sortedKeys(counts map[string]int) []string {
 	keys := make([]string, 0, len(counts))

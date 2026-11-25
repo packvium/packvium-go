@@ -43,7 +43,7 @@ func sceneRef() string {
 	if ref := os.Getenv("PACKVIUM_CONFORMANCE_REF"); ref != "" {
 		return ref
 	}
-	return "v1.5.0"
+	return "v1.6.0"
 }
 
 // TestMatchesTheSharedBoundCorpus recomputes the vectors the reference wrote at the tag. It
@@ -77,4 +77,5 @@ func TestMatchesTheSharedBoundCorpus(t *testing.T) {
 	if len(document.Cases) == 0 {
 		t.Fatal("no cases")
 	}
+	t.Logf("objective-bound scene (%s): %d cases recomputed", sceneRef(), len(document.Cases))
 }

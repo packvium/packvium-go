@@ -16,6 +16,7 @@ var ReasonCodes = []string{
 	"no_compatible_container_dimensions", "rotation_restricted", "payload_exceeded", "policy_rule",
 	"no_eligible_container", "time_limit", "effort_limit", "group_cannot_fit_together", "insufficient_support",
 	"no_feasible_placement", "search_exhausted", "exact_search_incomplete", "container_inventory_exhausted",
+	"axle_overloaded",
 }
 
 // ReasonMessages is one deterministic English sentence per reason code. Every reason the
@@ -39,6 +40,8 @@ var ReasonMessages = map[string]string{
 	"search_exhausted":              "was not placed before the configured search strategies were exhausted",
 	"exact_search_incomplete":       "was not placed because the exact search ended before proving a final answer",
 	"container_inventory_exhausted": "requires another compatible container, but the declared inventory is exhausted",
+	"axle_overloaded": "would overload an axle wherever it stood alone in any container that otherwise " +
+		"admits it",
 }
 
 // LevelPrefixes prefix an explanation with the kind of evidence behind it: a caller deciding

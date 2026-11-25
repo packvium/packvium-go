@@ -19,13 +19,112 @@ type reason struct {
 }
 
 func (r *unpackedReasons) explain(item domain.ItemInstance, containers []*domain.Container, reached bool,
-	packed []*domain.PackedContainer, cfg *config.PackingConfig) domain.UnpackedItem {
+	packed []*domain.PackedContainer, opened map[string]int64, cfg *config.PackingConfig) domain.UnpackedItem {
 	found := r.reason(item, containers, reached)
 	code := found.code
 	if code == "no_feasible_placement" && r.supportIsTheBlocker(item, packed, cfg) {
 		code = "insufficient_support"
 	}
+	if code == "no_feasible_placement" {
+		if limit := limitReason(item, containers, opened, cfg); limit != "" {
+			code = limit
+		}
+	}
 	return domain.NewUnpackedItem(item, code, found.details)
+}
+
+// openedByType counts the containers of each type a layout opened. O(P), once per layout.
+func openedByType(packed []*domain.PackedContainer) map[string]int64 {
+	opened := map[string]int64{}
+	for _, container := range packed {
+		opened[container.Container().ID()]++
+	}
+	return opened
+}
+
+// limitReason is the container limit that left an item out, for the no_feasible_placement
+// fallback, or "" when no limit explains it. Only containers that admit the item
+// structurally (a fitting rotation, its weight, its eligibility tags) are asked. When an axle
+// refuses the item alone in every one of them, the axle is the reason; otherwise, when every
+// one that would take it alone is out of stock, or max_containers is reached, the inventory
+// is. max_items, cumulative payload, tag limits, stop accessibility and an axle's share of a
+// full load can only refuse an item a fresh container would take, so they surface here too.
+// O(C * R) for C container types and R rotations; it reads only the request and the layout.
+func limitReason(instance domain.ItemInstance, containers []*domain.Container, opened map[string]int64,
+	cfg *config.PackingConfig) string {
+	item := instance.Item()
+	var envelopes []domain.Dimensions
+	for _, oriented := range item.Dimensions().UniqueRotations(item.AllowedRotations()) {
+		envelopes = append(envelopes, oriented.Dimensions.Expand(cfg.Clearance()))
+	}
+	weight := item.Weight().Ticks()
+	homes := item.EligibleContainerTags()
+	var admitting []*domain.Container
+	compatible := 0
+	for _, container := range containers {
+		payload := container.MaxPayload()
+		if !anyFitsAlone(container, envelopes) || (payload != nil && weight > payload.Ticks()) ||
+			(homes.Len() > 0 && !homes.Intersects(container.Tags())) {
+			continue
+		}
+		compatible++
+		if axlesAdmitAlone(container, envelopes, weight) {
+			admitting = append(admitting, container)
+		}
+	}
+	if compatible == 0 {
+		return ""
+	}
+	if len(admitting) == 0 {
+		return "axle_overloaded"
+	}
+	if limit := cfg.MaxContainers(); limit != nil {
+		total := int64(0)
+		for _, count := range opened {
+			total += count
+		}
+		if total >= *limit {
+			return "container_inventory_exhausted"
+		}
+	}
+	for _, container := range admitting {
+		if quantity := container.Quantity(); quantity == nil || opened[container.ID()] < *quantity {
+			return ""
+		}
+	}
+	return "container_inventory_exhausted"
+}
+
+func anyFitsAlone(container *domain.Container, envelopes []domain.Dimensions) bool {
+	for _, envelope := range envelopes {
+		if fitsAlone(container, envelope) {
+			return true
+		}
+	}
+	return false
+}
+
+func axlesAdmitAlone(container *domain.Container, envelopes []domain.Dimensions, weight int64) bool {
+	axles := container.Axles()
+	if axles == nil {
+		return true
+	}
+	for _, envelope := range envelopes {
+		if fitsAlone(container, envelope) && constraint.AxleAdmitsAlone(*axles, container.TareWeight().Ticks(),
+			container.InnerDimensions().Length().Ticks(), weight, envelope.Length().Ticks()) {
+			return true
+		}
+	}
+	return false
+}
+
+// fitsAlone reports whether one box of these dimensions fits the container empty: the frame,
+// and for a flat bag the girth rule too, so a bag too thin for an item proves it unplaceable.
+func fitsAlone(container *domain.Container, dimensions domain.Dimensions) bool {
+	if container.IsFlatBag() {
+		return domain.FitsFlatBagAlone(container.InnerDimensions(), dimensions)
+	}
+	return dimensions.FitsInside(container.InnerDimensions())
 }
 
 // reason runs the structural proofs first, since they hold whatever the search did, even past
@@ -86,7 +185,7 @@ func (r *unpackedReasons) provenByConstraint(item domain.ItemInstance, container
 func fitsSomewhere(item domain.ItemInstance, containers []*domain.Container, rotations []domain.Rotation) bool {
 	for _, container := range containers {
 		for _, oriented := range item.Item().Dimensions().UniqueRotations(rotations) {
-			if oriented.Dimensions.FitsInside(container.InnerDimensions()) {
+			if fitsAlone(container, oriented.Dimensions) {
 				return true
 			}
 		}

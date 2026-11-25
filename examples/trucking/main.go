@@ -271,7 +271,7 @@ func union(left, right []int) []int {
 	return all
 }
 
-// pythonBool keeps the reference's spelling of the flag, True or False.
+// pythonBool spells a boolean True or False, the shared notation.
 func pythonBool(value bool) string {
 	if value {
 		return "True"

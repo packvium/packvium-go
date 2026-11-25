@@ -3,6 +3,7 @@ package result
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/packvium/packvium-go/domain"
 )
@@ -218,4 +219,29 @@ func optimality(status PackingStatus, complete bool) string {
 		return "best_found"
 	}
 	return "not_proven"
+}
+
+// UnsupportedPlacementsWarning is the warning, or "" when it does not apply.
+// The default minimum_support_ratio of 0 is kept so no packing answer changes; a caller who
+// never set it is told instead. The count reads the support ratio every placement already
+// reports, O(placements) with no geometry: an obstacle gives no support, so an item on one
+// counts, while a fixed placement is a supporter like any other. A lattice summary is always
+// floor-up and has no placements. Every engine emits this text byte for byte.
+func UnsupportedPlacementsWarning(containers []*domain.PackedContainer, minimumSupportRatio float64) string {
+	if minimumSupportRatio != 0 {
+		return ""
+	}
+	count := 0
+	for _, container := range containers {
+		for _, placement := range container.Placements() {
+			if placement.SupportRatio() == 0 && placement.Position().Z() > 0 {
+				count++
+			}
+		}
+	}
+	if count == 0 {
+		return ""
+	}
+	return fmt.Sprintf("unsupported_placements: %d placement(s) rest on nothing above the container floor; "+
+		"set configuration.minimum_support_ratio above 0 to require support", count)
 }

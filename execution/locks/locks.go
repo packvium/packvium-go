@@ -1,5 +1,5 @@
 // Package locks is operator locks, expressed as request-derived constraints: an operator
-// saying "this item stays in this box, in this place" (docs/EXECUTION-PLAN.md).
+// saying "this item stays in this box, in this place".
 //
 // Honouring a lock must not become a way around the solver or the validator, and it is not.
 // A lock is a constraint.PlacementConstraint supplied through the existing

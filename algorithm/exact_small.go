@@ -46,11 +46,18 @@ func IsBetterState(candidate, incumbent *ContainerState) bool {
 }
 
 func landedCharge(state *ContainerState, cfg *config.PackingConfig) int64 {
-	return ChargeOrUnpriceable(state.Container, BilledTicksForConfig(state.Container, state.PayloadTicks, cfg))
+	return ChargeOrUnpriceable(state.Container, BilledStateTicks(state, cfg))
 }
 
 func isBetterForObjective(candidate *ContainerState, candidateVolume *big.Int, incumbent *ContainerState,
 	incumbentVolume *big.Int, cfg *config.PackingConfig) bool {
+	if ranksByVolume(cfg) {
+		// maximum_volume fills volume before it counts pieces, so the two keys swap.
+		if order := candidateVolume.Cmp(incumbentVolume); order != 0 {
+			return order > 0
+		}
+		return len(candidate.Placements) > len(incumbent.Placements)
+	}
 	if len(candidate.Placements) != len(incumbent.Placements) {
 		return len(candidate.Placements) > len(incumbent.Placements)
 	}
@@ -135,10 +142,16 @@ func (s *exactSearch) dfs(index int, state *ContainerState, reachable int, state
 		return
 	}
 	potentialCount, bestCount := stateCount+reachable, len(s.best.Placements)
-	if potentialCount < bestCount {
+	if ranksByVolume(s.cfg) {
+		// Fewer pieces can still be more volume, so only the volume bound cuts; an equal
+		// bound wins only on a strictly larger count.
+		order := new(big.Int).Add(stateVolume, s.suffixVolumes[index]).Cmp(s.bestVolume)
+		if order < 0 || (order == 0 && potentialCount <= bestCount) {
+			return
+		}
+	} else if potentialCount < bestCount {
 		return
-	}
-	if s.cfg.Objective() != LandedCostObjective && potentialCount == bestCount &&
+	} else if s.cfg.Objective() != LandedCostObjective && potentialCount == bestCount &&
 		new(big.Int).Add(stateVolume, s.suffixVolumes[index]).Cmp(s.bestVolume) <= 0 {
 		return
 	}

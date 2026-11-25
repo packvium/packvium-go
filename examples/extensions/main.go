@@ -9,8 +9,8 @@
 // deliberately paired with an honest warning about what you are giving up by using one.
 //
 // An extension point is an in-process, one-language interface. A custom constraint has no
-// representation on the wire, so an engine driven over JSON cannot see it, and the
-// cross-language test suite cannot check that the engines agree about it. Use
+// representation on the wire, so an engine driven over JSON cannot see it, and nothing can
+// check that the engines agree about it. Use
 // these to specialise one application in one language. A rule that must hold for every
 // caller of every binding belongs in the request as data instead -- as a policy rule, a
 // tag, or a field.
@@ -63,8 +63,8 @@ func (f FragileHeightLimit) Evaluate(context constraint.Context) constraint.Resu
 
 // EvenlyLoadedContainers prefers solutions whose containers weigh about the same.
 //
-// The six built-in objectives rank by space, packaging cost, billed weight, landed money,
-// stack height or value. None of them cares whether the weight is spread evenly across the
+// The seven built-in objectives rank by space, packaging cost, billed weight, landed money,
+// stack height, value or filled volume. None of them cares whether the weight is spread evenly across the
 // containers -- which is what a two-person lift or a van's axle balance actually depends
 // on, and is nowhere in the request.
 //
@@ -174,8 +174,8 @@ func main() {
 	}
 
 	fmt.Println()
-	fmt.Println("Neither rule above exists on the wire. Hand the same request to the Rust or")
-	fmt.Println("JavaScript engine and you get the unrestricted answer -- which is exactly why a")
+	fmt.Println("Neither rule above exists on the wire. Hand the same request to another Packvium")
+	fmt.Println("engine and you get the unrestricted answer -- which is exactly why a")
 	fmt.Println("rule everyone must obey belongs in the request as data, not in a type.")
 }
 
@@ -191,7 +191,8 @@ func vaseHeights(outcome *result.PackingResult) []int64 {
 	return heights
 }
 
-// pythonList renders strings the way the reference prints a list of them, so the output
+// pythonList renders strings in Python's list notation, which every Packvium language's
+// output shares, so the output
 // matches line for line.
 func pythonList(values []string) string {
 	quoted := make([]string, len(values))

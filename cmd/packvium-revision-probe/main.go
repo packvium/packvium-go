@@ -1,11 +1,11 @@
-// Command packvium-revision-probe is the batch probe the suite's revision and request-error
-// conformance (conformance/revisions/run.py, conformance/request_errors/run.py) drive,
-// answering the protocol of conformance/revisions/probe.php.
+// A test harness for cross-engine conformance; not a supported interface.
+//
+// Command packvium-revision-probe answers plan-revision and request-admission cases in batch.
 //
 // stdin is a JSON list of cases; stdout is one JSON line per case, in order:
 // {"error": code-or-null, "message": text-or-null, "json": text-or-null}. An "admit" case packs
 // a request through the ordinary JSON entry point and answers "admitted", or the refusal with
-// its "reason" and "field" as well (docs/ERRORS.md). A refusal is an outcome, not a failure,
+// its "reason" and "field" as well. A refusal is an outcome, not a failure,
 // so the probe exits 0 unless it cannot run at all, and then 255.
 package main
 

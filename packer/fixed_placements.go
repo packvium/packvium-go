@@ -22,7 +22,7 @@ import (
 // refused before any search rather than exempted: an exempt item would need a second
 // validator, and the engines would have to agree on which rules it skips. The check is the
 // ordinary independent validator run over the fixed set alone, with item accounting left out
-// because the free items have not been placed yet (docs/PLAN-REVISIONS.md).
+// because the free items have not been placed yet.
 
 // fixedLoad is what the solve starts from: the fixed containers in opening order (request
 // container order, then instance), each holding only its fixed placements, and every

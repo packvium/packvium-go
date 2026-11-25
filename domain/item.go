@@ -46,6 +46,12 @@ type ItemSpec struct {
 	CompressionRatioPPM       *int64
 	MaxCompressionPressureKPA *int64
 	Value                     *int64
+	// StackingGroup is the stacking class this item belongs to, and AcceptsStackingGroups the
+	// classes it may carry directly on its top face. An
+	// empty list is unconstrained; a non-empty one is closed, so an item with no class rests
+	// on no constrained item: a forgotten classification fails closed, never open.
+	StackingGroup         *string
+	AcceptsStackingGroups []string
 }
 
 // NewItemSpec is a spec with the reference defaults: one unit, stackable, any rotation,
@@ -63,7 +69,9 @@ type Item struct {
 	tags   TagSet
 	banned TagSet
 	homes  TagSet
-	shapes *hullShapes
+	// carries is the AcceptsStackingGroups set.
+	carries TagSet
+	shapes  *hullShapes
 }
 
 // hullShapes memoises the rotated hull per rotation. Building one is O(v^4), and it
@@ -92,9 +100,11 @@ func NewItem(spec ItemSpec) (*Item, error) {
 	}
 	frozen.HullVertices = append([]hull.Vertex(nil), spec.HullVertices...)
 	frozen.Tags, frozen.IncompatibleTags, frozen.EligibleContainerTags = nil, nil, nil
+	frozen.StackingGroup, frozen.AcceptsStackingGroups = copyString(spec.StackingGroup), nil
 	return &Item{
 		spec: frozen, tags: NewTagSet(spec.Tags), banned: NewTagSet(spec.IncompatibleTags),
-		homes: NewTagSet(spec.EligibleContainerTags), shapes: &hullShapes{},
+		homes: NewTagSet(spec.EligibleContainerTags), carries: NewTagSet(spec.AcceptsStackingGroups),
+		shapes: &hullShapes{},
 	}, nil
 }
 
@@ -220,6 +230,31 @@ func (i *Item) HullVertices() []hull.Vertex {
 func (i *Item) CompressionRatioPPM() *int64       { return copyInt64(i.spec.CompressionRatioPPM) }
 func (i *Item) MaxCompressionPressureKPA() *int64 { return copyInt64(i.spec.MaxCompressionPressureKPA) }
 func (i *Item) Value() *int64                     { return copyInt64(i.spec.Value) }
+func (i *Item) StackingGroup() *string            { return copyString(i.spec.StackingGroup) }
+
+// AcceptsStackingGroups are the stacking classes this item may carry directly; empty is
+// unconstrained.
+func (i *Item) AcceptsStackingGroups() TagSet { return i.carries }
+
+// CarriesItself reports whether a column of this one item type passes every stacking edge
+//.
+func (i *Item) CarriesItself() bool {
+	return i.spec.Stackable && (i.carries.Len() == 0 ||
+		(i.spec.StackingGroup != nil && i.carries.Has(*i.spec.StackingGroup)))
+}
+
+// StackingRefusal is why this item refuses one of upperGroup (nil for none) resting directly
+// on it, or "" when it does not. O(1). A non-empty accepted list is closed, so an item with
+// no group is in none of them.
+func (i *Item) StackingRefusal(upperGroup *string) string {
+	if !i.spec.Stackable {
+		return "non_stackable"
+	}
+	if i.carries.Len() > 0 && (upperGroup == nil || !i.carries.Has(*upperGroup)) {
+		return "stacking_group_incompatible"
+	}
+	return ""
+}
 
 // HullShape is the item's hull in one rotation, built at most once per rotation.
 func (i *Item) HullShape(rotation Rotation) (*hull.Shape, error) {
@@ -233,7 +268,9 @@ func (i *Item) HullShape(rotation Rotation) (*hull.Shape, error) {
 // IsStackSensitive reports whether what rests on this item can change a verdict: it
 // refuses load, limits it, or yields to it.
 func (i *Item) IsStackSensitive() bool {
-	return !i.spec.Stackable || i.spec.MaxTopLoad != nil || i.spec.MaxStackedItems != nil ||
+	// A stacking group alone does not count: such an item is refused only by a constrained
+	// item beneath it, and that item already switched the graph on.
+	return !i.spec.Stackable || i.carries.Len() > 0 || i.spec.MaxTopLoad != nil || i.spec.MaxStackedItems != nil ||
 		i.spec.MaxCompressionPressureKPA != nil
 }
 

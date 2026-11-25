@@ -58,6 +58,9 @@ func RejectUnsupported(request map[string]interface{}, unsupported UnsupportedFi
 			}
 		}
 	}
+	for _, combination := range madeToMeasureCombinations(request) {
+		found[combination] = true
+	}
 	if len(found) == 0 {
 		return nil
 	}
@@ -68,6 +71,47 @@ func RejectUnsupported(request map[string]interface{}, unsupported UnsupportedFi
 	sort.Strings(names)
 	return &UnsupportedFeatureError{fmt.Sprintf("unsupported_feature: the Go engine does not yet implement %s; "+
 		"the request was rejected instead of silently ignoring public fields", strings.Join(names, ", "))}
+}
+
+// madeToMeasureCombinations are the made-to-measure combinations 1.6 refuses. Each reads a
+// container dimension or position the fabricated box does not keep. Checked on the raw request, before any request error.
+// O(containers + fixed placements).
+func madeToMeasureCombinations(request map[string]interface{}) []string {
+	var found []string
+	measured := map[string]bool{}
+	containers, _ := request["containers"].([]interface{})
+	for _, entry := range containers {
+		container, ok := entry.(map[string]interface{})
+		if !ok || container["made_to_measure"] == nil {
+			continue
+		}
+		if id, ok := container["id"].(string); ok {
+			measured[id] = true
+		}
+		if container["axles"] != nil {
+			found = append(found, "container.made_to_measure+axles")
+		}
+		if obstacles, ok := container["obstacles"].([]interface{}); ok && len(obstacles) > 0 {
+			found = append(found, "container.made_to_measure+obstacles")
+		}
+		if positiveNumber(container["void_fill_reserve_ratio"]) {
+			found = append(found, "container.made_to_measure+void_fill_reserve_ratio")
+		}
+	}
+	fixed, _ := request["fixed_placements"].([]interface{})
+	if len(measured) == 0 {
+		return found
+	}
+	for _, entry := range fixed {
+		placement, ok := entry.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if containerType, ok := placement["container_type"].(string); ok && measured[containerType] {
+			return append(found, "fixed_placements+container.made_to_measure")
+		}
+	}
+	return found
 }
 
 func collect(entries interface{}, scope string, keys []string, found map[string]bool) {

@@ -130,12 +130,13 @@ func main() {
 	fmt.Println("packed", placed, "shelves,", len(result.Unpacked), "left over")
 }
 
-// wire prints a {ticks, value, unit} map the way the reference prints a dict.
+// wire prints a {ticks, value, unit} map in Python's dict notation, which every Packvium
+// language's output shares.
 func wire(fields map[string]interface{}) string {
 	return fmt.Sprintf("{'ticks': %d, 'value': '%s', 'unit': '%s'}", fields["ticks"], fields["value"], fields["unit"])
 }
 
-// pythonBool spells a boolean the way the reference example prints it.
+// pythonBool spells a boolean True or False, the shared notation.
 func pythonBool(value bool) string {
 	if value {
 		return "True"

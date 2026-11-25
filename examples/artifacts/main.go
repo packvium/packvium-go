@@ -141,7 +141,7 @@ func sameBytes(artifact object) {
 		fmt.Printf("  a v2 document: refused with %s\n", err.(*artifacts.Error).Code)
 	}
 	paragraph("",
-		"  The canonical form is RFC 8785, so PHP, Rust and JavaScript build these exact",
+		"  The canonical form is RFC 8785, so every Packvium engine builds these exact",
 		"  bytes from the same request and result. A reader that meets a format it does not",
 		"  know refuses it by name rather than drawing half of it.")
 }

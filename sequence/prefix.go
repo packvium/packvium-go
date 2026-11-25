@@ -17,19 +17,27 @@ func VerifyLoadingPrefixBusinessRules(placements []domain.Placement, order []int
 		return err
 	}
 	densityLimit := constraint.DensityLimitTicks(container)
+	// A caller may hand this any scene, validated or not, so the stacking-group rule is
+	// re-checked here too: only when some item declares a list, and only on the edges of the
+	// step's own new placement, since every earlier edge was judged at its step.
+	grouped := false
+	for _, placement := range placements {
+		grouped = grouped || placement.Instance().Item().AcceptsStackingGroups().Len() > 0
+	}
 	present := make([]domain.Placement, 0, len(placements))
 	for step, index := range order {
 		present = append(present, placements[index])
-		if problem := prefixProblem(present, densityLimit); problem != nil {
+		if problem := prefixProblem(present, densityLimit, grouped); problem != nil {
 			return replayError(index, step, problem.Code+": "+problem.Detail)
 		}
 	}
 	return nil
 }
 
-func prefixProblem(present []domain.Placement, densityLimit *int64) *constraint.Violation {
+func prefixProblem(present []domain.Placement, densityLimit *int64, grouped bool) *constraint.Violation {
 	units := constraint.Units(present)
-	analysis := constraint.NewLoadAnalysis(units, constraint.NewLoadSupportGraph(units, 1))
+	graph := constraint.NewLoadSupportGraph(units, 1)
+	analysis := constraint.NewLoadAnalysis(units, graph)
 	if problem := analysis.Overloaded(); problem != nil {
 		return problem
 	}
@@ -42,6 +50,11 @@ func prefixProblem(present []domain.Placement, densityLimit *int64) *constraint.
 	for index, count := range analysis.StackedCounts() {
 		if !present[index].Instance().Item().Stackable() && count > 0 {
 			return &constraint.Violation{Code: "non_stackable_item_has_load", Detail: units[index].Label}
+		}
+	}
+	if grouped {
+		if refusal := graph.NonStackableFailure(present, present[len(present)-1].Instance(), len(present)-1); refusal != nil {
+			return refusal
 		}
 	}
 	return groundContactProblem(present)

@@ -141,3 +141,29 @@ func saturated(value *big.Int) int64 {
 	}
 	return math.MaxInt64
 }
+
+// AxleAdmitsAlone reports whether one item, alone in an empty container, has an x-origin that
+// overloads neither axle. Each limit is linear in the item's doubled centre, so the
+// feasible origins form one interval whose ends AxleBalancedOrigins gives exactly. O(1). It
+// says nothing about a loaded container: a counterweight behind the rear axle can relieve the
+// front one, which is why the reason it backs is inferred.
+func AxleAdmitsAlone(axles [2]domain.Axle, tareWeightTicks, innerLengthTicks, itemWeightTicks,
+	envelopeLengthTicks int64) bool {
+	lastOrigin := innerLengthTicks - envelopeLengthTicks
+	if lastOrigin < 0 {
+		return false
+	}
+	if itemWeightTicks <= 0 {
+		return AxleLoadExceeded(axles, nil, tareWeightTicks, innerLengthTicks) == nil
+	}
+	origins := AxleBalancedOrigins(axles, nil, tareWeightTicks, innerLengthTicks, itemWeightTicks,
+		envelopeLengthTicks)
+	lowest, highest := int64(0), lastOrigin
+	if axles[0].MaxLoad() != nil {
+		lowest = origins[0]
+	}
+	if axles[1].MaxLoad() != nil {
+		highest = origins[len(origins)-1]
+	}
+	return ints.Max(0, lowest) <= ints.Min(lastOrigin, highest)
+}

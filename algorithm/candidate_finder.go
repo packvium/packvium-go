@@ -9,6 +9,7 @@ import (
 	"github.com/packvium/packvium-go/constraint"
 	"github.com/packvium/packvium-go/domain"
 	"github.com/packvium/packvium-go/hull"
+	"github.com/packvium/packvium-go/internal/ints"
 )
 
 // unlimited is the candidate count of a finder call that keeps every feasible placement.
@@ -223,8 +224,10 @@ type scan struct {
 	routeSensitive       bool
 	placementOffset      int
 	clearance            int64
-	found                []Candidate
-	best                 *Candidate
+	// bag is a flat bag, whose girth rule couples the axes.
+	bag   bool
+	found []Candidate
+	best  *Candidate
 	// retained is a heap of the best max candidates so far, worst at the root, used when
 	// max > 1; ordinal numbers the candidates that reach it, the stable sort's tie-break.
 	retained []rankedCandidate
@@ -260,6 +263,7 @@ func newScan(state *ContainerState, item domain.ItemInstance, cfg *config.Packin
 		routeSensitive:  routeSensitive,
 		placementOffset: len(state.Bounds) - len(state.Placements),
 		clearance:       cfg.Clearance().Ticks(),
+		bag:             state.Container.IsFlatBag(),
 	}
 }
 
@@ -285,7 +289,8 @@ func (s *scan) visit(point domain.Point, forms []form) {
 		candidateForm := &forms[index]
 		s.stats.PlacementsAttempted++
 		x2, y2, z2 := point.X()+candidateForm.dx, point.Y()+candidateForm.dy, point.Z()+candidateForm.dz
-		if x2 > inner.Length().Ticks() || y2 > inner.Width().Ticks() || z2 > inner.Height().Ticks() {
+		if x2 > inner.Length().Ticks() || y2 > inner.Width().Ticks() || z2 > inner.Height().Ticks() ||
+			(s.bag && !s.girthAdmits(inner, x2, y2, z2)) {
 			continue
 		}
 		position := domain.MustPoint(point.X()+s.clearance, point.Y()+s.clearance, point.Z()+s.clearance)
@@ -311,6 +316,13 @@ func (s *scan) visit(point domain.Point, forms []form) {
 		s.stats.CandidatesEvaluated++
 		s.keep(candidate)
 	}
+}
+
+// girthAdmits is the flat-bag rule over the running extents grown by the candidate:
+// O(1), and the extents only grow, so no admitted verdict flips.
+func (s *scan) girthAdmits(inner domain.Dimensions, x2, y2, z2 int64) bool {
+	state := s.state
+	return domain.GirthAdmits(inner, ints.Max(x2, state.MaxX), ints.Max(y2, state.MaxY), ints.Max(z2, state.MaxZ))
 }
 
 func (s *scan) placementAt(position, point domain.Point, candidateForm *form) domain.Placement {

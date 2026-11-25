@@ -7,6 +7,7 @@ import (
 	"github.com/packvium/packvium-go/config"
 	"github.com/packvium/packvium-go/constraint"
 	"github.com/packvium/packvium-go/domain"
+	"github.com/packvium/packvium-go/internal/ints"
 	"github.com/packvium/packvium-go/result"
 )
 
@@ -52,12 +53,13 @@ func (o *SolverOrchestrator) SolvePortfolio(items []domain.ItemInstance, contain
 // start fills them first and keeps them, whatever else it does.
 func (o *SolverOrchestrator) SolvePortfolioFrom(items []domain.ItemInstance, containers []*domain.Container,
 	cfg *config.PackingConfig, deadline *Deadline, preloaded []*domain.PackedContainer) PortfolioRun {
-	starts := o.starts(items, cfg)
+	starts := o.starts(items, containers, cfg)
 	budget := cfg.EffortBudget()
 	if budget != nil && budget.MaxRestarts != nil && *budget.MaxRestarts < int64(len(starts)) {
 		starts = starts[:*budget.MaxRestarts]
 	}
-	return o.solveSequential(items, containers, cfg, deadline, starts, budget, preloaded)
+	run := o.solveSequential(items, containers, cfg, deadline, starts, budget, preloaded)
+	return withoutABlockStartThatOnlyTies(run, starts, cfg)
 }
 
 func (o *SolverOrchestrator) solveSequential(items []domain.ItemInstance, containers []*domain.Container,
@@ -85,10 +87,7 @@ func (o *SolverOrchestrator) solveSequential(items []domain.ItemInstance, contai
 		if budget != nil {
 			slice = slice.WithEffort(budget, stats)
 		}
-		startConfig := cfg
-		if strings.HasSuffix(current.orderName, ":greedy") || strings.Contains(current.orderName, ":late_") {
-			startConfig = greedyConfig(cfg)
-		}
+		startConfig := startConfigFor(current.orderName, cfg)
 		outcome := o.acrossContainers(current.solver, current.order, containers, startConfig, stats, slice, preloaded)
 		effortReached := slice.EffortExceeded()
 		wallReached := outcome.reached && slice.RemainingNS() <= 0
@@ -149,7 +148,8 @@ func (o *SolverOrchestrator) finishPortfolio(items []domain.ItemInstance, contai
 	return PortfolioRun{solutions, finished}
 }
 
-func (o *SolverOrchestrator) starts(items []domain.ItemInstance, cfg *config.PackingConfig) []start {
+func (o *SolverOrchestrator) starts(items []domain.ItemInstance, containers []*domain.Container,
+	cfg *config.PackingConfig) []start {
 	orders := ItemOrders(items, cfg, o.customOrders)
 	var starts []start
 	for _, solver := range o.solvers(items, cfg) {
@@ -160,6 +160,12 @@ func (o *SolverOrchestrator) starts(items []domain.ItemInstance, cfg *config.Pac
 		}
 		for _, order := range chosen {
 			starts = append(starts, start{solver, order.Name, order.Order})
+		}
+	}
+	// Last, so a restart budget drops it first and the profile's own starts keep theirs.
+	if len(orders) > 0 {
+		if blocks := o.blockStart(items, containers, cfg); blocks != nil {
+			starts = append(starts, start{blocks, orders[0].Name, orders[0].Order})
 		}
 	}
 	if cfg.ContainerPlanBeamWidth() <= 1 || cfg.Profile() != config.Quality {
@@ -258,16 +264,127 @@ func refinementOf(placeholder start, results []RawSolution, completed map[string
 	return start{base.solver, base.orderName + ":late_" + itemType, append(late, moved...)}, true
 }
 
-// greedyConfig is the same configuration with the beams switched off, for the cheap greedy
-// pass of a quality start.
-func greedyConfig(cfg *config.PackingConfig) *config.PackingConfig {
-	options := cfg.Options()
-	options.MaxCandidatesPerItem, options.ContainerPlanBeamWidth, options.ContainerPlanNodeLimit = 1, 1, 1
-	greedy, err := config.New(options)
+// runsGreedy reports whether a start keeps one candidate per item: the greedy orderings and
+// their late-type neighbourhoods. A :beam refinement of a winning neighbourhood still carries
+// :late_ in its name, yet it is the one start meant to search wide.
+func runsGreedy(orderName string) bool {
+	if strings.HasSuffix(orderName, ":beam") {
+		return false
+	}
+	return strings.HasSuffix(orderName, ":greedy") || strings.Contains(orderName, ":late_")
+}
+
+// lateTypeRefinementWidth is the beam width and candidates per item for the best:beam
+// refinement of a winning late-type ordering. Other refinements keep the
+// profile's width.
+const lateTypeRefinementWidth = 4
+
+// startConfigFor is the configuration one portfolio start searches with: the beams off for a
+// greedy pass, narrowed to lateTypeRefinementWidth for a late-type refinement.
+func startConfigFor(orderName string, cfg *config.PackingConfig) *config.PackingConfig {
+	if runsGreedy(orderName) {
+		options := cfg.Options()
+		options.MaxCandidatesPerItem, options.ContainerPlanBeamWidth, options.ContainerPlanNodeLimit = 1, 1, 1
+		return mustConfig(options)
+	}
+	if strings.HasSuffix(orderName, ":beam") && strings.Contains(orderName, ":late_") {
+		options := cfg.Options()
+		options.MaxCandidatesPerItem = ints.Min(options.MaxCandidatesPerItem, lateTypeRefinementWidth)
+		options.ContainerPlanBeamWidth = ints.Min(options.ContainerPlanBeamWidth, lateTypeRefinementWidth)
+		return mustConfig(options)
+	}
+	return cfg
+}
+
+// mustConfig builds a configuration derived from a valid one, which cannot be refused.
+func mustConfig(options config.Options) *config.PackingConfig {
+	derived, err := config.New(options)
 	if err != nil {
 		refuse(err)
 	}
-	return greedy
+	return derived
+}
+
+// blockStartNodeLimit is the lattice nodes the block start added to fast and balanced may
+// enumerate per mode: the bound quality gives the same solver through
+// containerPlanNodeLimit.
+const blockStartNodeLimit = 100_000
+
+// blockStart is the block start fast and balanced add to their own, or nil.
+// Single-type blocks fill a carton load in milliseconds where a per-item search spends its
+// whole budget, so the low-latency profiles run them as one more start and let the score
+// decide; only where the lattice can express the whole request, since a start that fell back
+// to the per-item solver would repeat one already in the portfolio. One item type is the
+// grid's case, and it is exact there. O(n + c * n) to check the gates.
+func (o *SolverOrchestrator) blockStart(items []domain.ItemInstance, containers []*domain.Container,
+	cfg *config.PackingConfig) *HomogeneousBlockSolver {
+	if (cfg.Profile() != config.Fast && cfg.Profile() != config.Balanced) || len(cfg.Solvers()) > 0 {
+		return nil
+	}
+	if len(o.customSolvers) > 0 || len(o.customConstraints) > 0 || len(sortedItemTypes(items)) < 2 {
+		return nil
+	}
+	// A lattice takes whichever type fills best; it cannot honour a caller's say over which
+	// item goes first, so it stays out when the items do not all lead alike.
+	for _, item := range items[1:] {
+		if OrderingLead(item, cfg).Compare(OrderingLead(items[0], cfg)) != 0 {
+			return nil
+		}
+	}
+	modes := []blockMode{countMode, volumeMode}
+	if cfg.Profile() == config.Fast {
+		// One enumeration, the one the objective ranks by: fast is latency-bound.
+		modes = []blockMode{countMode}
+		if ranksByVolume(cfg) {
+			modes = []blockMode{volumeMode}
+		}
+	}
+	solver := newBoundedBlockSolver(modes, blockStartNodeLimit)
+	if len(containers) == 0 {
+		return nil
+	}
+	for _, container := range containers {
+		if !solver.supports(container, items, cfg) {
+			return nil
+		}
+	}
+	return solver
+}
+
+// withoutABlockStartThatOnlyTies drops the added block start's answer unless it strictly
+// beats every start of the profile's own: on a tie the ranking falls to the solver name,
+// which would hand the result to a lattice that knows nothing of the orderings the profile's
+// own starts honour. Its start record stays. O(s) scores.
+func withoutABlockStartThatOnlyTies(run PortfolioRun, starts []start, cfg *config.PackingConfig) PortfolioRun {
+	if len(starts) == 0 {
+		return run
+	}
+	last := starts[len(starts)-1]
+	blocks, ok := last.solver.(*HomogeneousBlockSolver)
+	if !ok || blocks.nodeLimit == nil {
+		return run
+	}
+	scorer := ResolveObjective(cfg.Objective(), cfg)
+	added := last.id()
+	var bestOwn ObjectiveScore
+	for _, solution := range run.Solutions {
+		if solution.SolverName == added {
+			continue
+		}
+		if score := scorer.Score(solution); bestOwn == nil || score.Compare(bestOwn) < 0 {
+			bestOwn = score
+		}
+	}
+	if bestOwn == nil {
+		return run
+	}
+	kept := make([]RawSolution, 0, len(run.Solutions))
+	for _, solution := range run.Solutions {
+		if solution.SolverName != added || scorer.Score(solution).Compare(bestOwn) < 0 {
+			kept = append(kept, solution)
+		}
+	}
+	return PortfolioRun{kept, run.Starts}
 }
 
 func (o *SolverOrchestrator) solvers(items []domain.ItemInstance, cfg *config.PackingConfig) []SingleContainerSolver {
@@ -358,6 +475,13 @@ func recordRootBound(solver SingleContainerSolver, beam bool, items []domain.Ite
 	containers []*domain.Container, cfg *config.PackingConfig, stats *SearchStats) {
 	if stats.objectiveLowerBound != nil || (!beam && solver.Name() != "exact_small") || cfg.Objective() != "default" {
 		return
+	}
+	// Its unused-volume and height keys are ratios against a declared size, and a
+	// made-to-measure box has none until it is cut: the bound would not be admissible.
+	for _, container := range containers {
+		if container.MadeToMeasure() != nil {
+			return
+		}
 	}
 	stats.SetObjectiveLowerBound(ComputeObjectiveBounds(items, containers))
 }

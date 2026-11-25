@@ -180,6 +180,9 @@ func (p *Packer) rank(raw algorithm.RawSolution, request *domain.PackingRequest,
 			}
 		}
 	}
+	if unsupported := result.UnsupportedPlacementsWarning(raw.Containers, p.cfg.MinimumSupportRatio()); unsupported != "" {
+		warnings = append(warnings, unsupported)
+	}
 	termination, err := result.AggregateTermination(markWinner(records, raw.SolverName), status == result.InvalidResult)
 	if err != nil {
 		return nil, err

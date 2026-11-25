@@ -129,7 +129,7 @@ func (p *containerPlanner) greedy(solver SingleContainerSolver, items []domain.I
 			}
 			var one SingleContainerSolution
 			if untilTimeLimit(func() {
-				one = solver.PackOne(container, sequence[container.ID()]+1, remaining, cfg, stats, deadline)
+				one, _ = p.trial(solver, container, sequence[container.ID()]+1, remaining, cfg, stats, deadline)
 			}) {
 				reached = true
 				break
@@ -143,7 +143,7 @@ func (p *containerPlanner) greedy(solver SingleContainerSolver, items []domain.I
 				}
 				continue
 			}
-			trials = append(trials, trial{p.roundScore(container, one, len(remaining), cfg), one})
+			trials = append(trials, trial{p.roundScore(one, len(remaining), cfg), one})
 			if reached {
 				break
 			}
@@ -171,6 +171,88 @@ func (p *containerPlanner) greedy(solver SingleContainerSolver, items []domain.I
 	return planOutcome{packed, unpacked, proven, reached, dominantLattice}
 }
 
+// trial is one container's trial for a round and how many single-container solves it spent:
+// one for a declared container, the rung chain for a made-to-measure one, whose trial comes
+// back already fabricated. A cut by the time
+// limit unwinds as TimeLimitReached.
+func (p *containerPlanner) trial(solver SingleContainerSolver, container *domain.Container, sequence int64,
+	items []domain.ItemInstance, cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline) (SingleContainerSolution, int64) {
+	if container.MadeToMeasure() == nil {
+		return solver.PackOne(container, sequence, items, cfg, stats, deadline), 1
+	}
+	return p.madeToMeasureTrial(solver, container, sequence, items, cfg, stats, deadline)
+}
+
+// madeToMeasureTrial tries each solving envelope in ascending order and keeps the first that
+// places every item; failing that, the trial the round's own key prefers, the smaller rung on
+// a tie. At most four solves and two trial states alive. A compact lattice cannot describe a
+// box cut to the achieved extent, so the rung solves always report coordinates, and a rung
+// choice is a heuristic, so the trial is never exhaustive. O(r) to size the rungs for r
+// items, plus the solves.
+func (p *containerPlanner) madeToMeasureTrial(solver SingleContainerSolver, container *domain.Container,
+	sequence int64, items []domain.ItemInstance, cfg *config.PackingConfig, stats *SearchStats,
+	deadline *Deadline) (SingleContainerSolution, int64) {
+	maximum := domain.Triple(container.InnerDimensions())
+	rungs := container.MadeToMeasure().SolvingEnvelopes(maximum, domain.InstanceEdges(items, cfg.Clearance().Ticks()))
+	rungConfig := cfg
+	if !cfg.RequirePlacementCoordinates() {
+		options := cfg.Options()
+		options.RequirePlacementCoordinates = true
+		rungConfig = mustConfig(options)
+	}
+	var best, last *SingleContainerSolution
+	var bestKey SortKey
+	stopped := false
+	trials := int64(0)
+	for _, rung := range rungs {
+		var one SingleContainerSolution
+		if untilTimeLimit(func() {
+			one = solver.PackOne(container.WithEnvelope(rung), sequence, items, rungConfig, stats, deadline)
+		}) {
+			if best == nil {
+				panic(TimeLimitReached{"packing time limit reached"})
+			}
+			stopped = true
+			break
+		}
+		trials++
+		stopped = one.TimeLimitReached
+		solved := one
+		last = &solved
+		if one.State.PlacementCount() > 0 {
+			fabricated := fabricatedTrial(container, one)
+			if one.State.PlacementCount() == int64(len(items)) {
+				return fabricated, trials
+			}
+			key := p.roundScore(fabricated, len(items), cfg)
+			if best == nil || key.Compare(bestKey) < 0 {
+				best, bestKey = &fabricated, key
+			}
+		}
+		if stopped || deadline.Expired() {
+			stopped = true
+			break
+		}
+	}
+	chosen := last
+	if best != nil {
+		chosen = best
+	}
+	result := *chosen
+	result.TimeLimitReached = result.TimeLimitReached || stopped
+	return result, trials
+}
+
+// fabricatedTrial is a rung trial as the box cut for it: the achieved extent of its
+// placements, envelope far faces with clearance, rounded up onto the machine grid. O(p).
+func fabricatedTrial(declared *domain.Container, one SingleContainerSolution) SingleContainerSolution {
+	state := one.State.Copy()
+	state.Container = declared.Fabricate(domain.Extent(state.Placements))
+	state.usableVolume = nil
+	one.State, one.Exhaustive, one.DominantLattice = state, false, false
+	return one
+}
+
 func withoutIDs(items []domain.ItemInstance, ids map[string]bool) []domain.ItemInstance {
 	var kept []domain.ItemInstance
 	for _, item := range items {
@@ -181,13 +263,24 @@ func withoutIDs(items []domain.ItemInstance, ids map[string]bool) []domain.ItemI
 	return kept
 }
 
-func (p *containerPlanner) roundScore(container *domain.Container, one SingleContainerSolution, remainingCount int,
+// roundScore is the greedy round's key for one trial, read from the container the trial
+// built: a made-to-measure trial carries its fabricated box, so the key prices the box that
+// ships, never the machine maximum.
+func (p *containerPlanner) roundScore(one SingleContainerSolution, remainingCount int,
 	cfg *config.PackingConfig) SortKey {
+	container := one.State.Container
 	billed := cfg.Objective() == "shipping_cost" || cfg.Objective() == LandedCostObjective
 	if !billed || cfg.DimensionalWeightDivisor() == nil {
+		if _, defaultSelector := p.selector.(DefaultContainerSelector); defaultSelector && ranksByVolume(cfg) {
+			// The round keeps the trial that loaded the most volume, not the one that seated
+			// the most pieces. A caller's own selector is left alone.
+			used := one.State.UsedVolume
+			return SortKey{Big(negated(used)), Int(container.CostMinor()),
+				Big(new(big.Int).Sub(container.InnerDimensions().Volume(), used)), Str(container.ID())}
+		}
 		return p.selector.Score(container, one)
 	}
-	billedTicks := BilledTicksForConfig(container, one.State.PayloadTicks, cfg)
+	billedTicks := BilledStateTicks(one.State, cfg)
 	placed := one.State.PlacementCount()
 	if cfg.Objective() == "shipping_cost" {
 		return SortKey{Int(-placed), Int(billedTicks), Str(container.ID())}
@@ -224,8 +317,9 @@ func commitState(state *ContainerState) (*domain.PackedContainer, map[string]boo
 func (p *containerPlanner) explainAll(remaining []domain.ItemInstance, containers []*domain.Container, reached bool,
 	packed []*domain.PackedContainer, cfg *config.PackingConfig) []domain.UnpackedItem {
 	unpacked := make([]domain.UnpackedItem, 0, len(remaining))
+	opened := openedByType(packed)
 	for _, item := range remaining {
-		unpacked = append(unpacked, p.reasons.explain(item, containers, reached, packed, cfg))
+		unpacked = append(unpacked, p.reasons.explain(item, containers, reached, packed, opened, cfg))
 	}
 	return unpacked
 }
@@ -281,14 +375,19 @@ func (p *containerPlanner) plans(solver SingleContainerSolver, items []domain.It
 				if current.stock.exhausted(container.ID()) {
 					continue
 				}
-				nodes++
 				var one SingleContainerSolution
+				var solves int64
 				if untilTimeLimit(func() {
-					one = solver.PackOne(container, current.sequences[container.ID()]+1, current.remaining, cfg, stats, deadline)
+					one, solves = p.trial(solver, container, current.sequences[container.ID()]+1, current.remaining, cfg,
+						stats, deadline)
 				}) {
+					nodes++
 					reached = true
 					break
 				}
+				// Each rung is one single-container solve, so the node limit keeps bounding the
+				// work of a made-to-measure chain.
+				nodes += solves
 				reached = reached || one.TimeLimitReached
 				if one.State.PlacementCount() == 0 {
 					continue
@@ -400,7 +499,8 @@ func additionalContainerLowerBound(current plan, containers []*domain.Container)
 		if capacity.Sign() > 0 {
 			required := new(big.Int)
 			for _, item := range current.remaining {
-				required.Add(required, item.Item().Dimensions().Volume())
+				// A hull counts its own solid, as the beam and exact floors do.
+				required.Add(required, domain.ItemOccupiedVolume(item))
 			}
 			required.Add(required, capacity).Sub(required, big.NewInt(1)).Quo(required, capacity)
 			lower = ints.Max(lower, exactInt64(required))

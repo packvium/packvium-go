@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// The Python examples' output at v1.5.0, kept beside the programs so the test runs wherever
+// The Python examples' output at v1.6.0, kept beside the programs so the test runs wherever
 // the module does, with no checkout of the suite repository.
 const referenceDirectory = "testdata"
 
@@ -25,7 +25,8 @@ const referenceDirectory = "testdata"
 // exactly; a listed line that is no longer printed fails the test as stale.
 var languageWording = map[string]map[string]string{
 	"artifacts": {
-		"  contains a script or an external resource: false": "  contains a script or an external resource: False",
+		"  contains a script or an external resource: false":                            "  contains a script or an external resource: False",
+		"  The canonical form is RFC 8785, so every Packvium engine builds these exact": "  The canonical form is RFC 8785, so PHP, Rust and JavaScript build these exact",
 	},
 	"basic": {
 		"the full result as a plain map is what examples/serialization explores:": "the full result as a plain dict is what serialization.py explores:",
@@ -36,26 +37,30 @@ var languageWording = map[string]map[string]string{
 		"the CLI takes exactly the document above:  echo '...' | go run ./cmd/packvium":                                              "the CLI takes exactly the document above:  echo '...' | python3 -m packvium",
 	},
 	"extensions": {
-		"rule everyone must obey belongs in the request as data, not in a type.": "rule everyone must obey belongs in the request as data, not in a class.",
+		"Neither rule above exists on the wire. Hand the same request to another Packvium": "Neither rule above exists on the wire. Hand the same request to the Rust or",
+		"engine and you get the unrestricted answer -- which is exactly why a":             "JavaScript engine and you get the unrestricted answer -- which is exactly why a",
+		"rule everyone must obey belongs in the request as data, not in a type.":           "rule everyone must obey belongs in the request as data, not in a class.",
 	},
 	"commerce": {
 		"   nothing matched, so the shipment is allowed with no citation: nil": "   nothing matched, so the shipment is allowed with no citation: None",
 	},
 	"execution": {
-		// The reference's section 4 speaks for its four engines and names its JavaScript
-		// example; this port's text speaks for this engine instead.
+		// The Python text of sections 2 and 4 speaks for four engines and names its
+		// JavaScript example; this text speaks for every Packvium engine instead.
+		"  loading order from geometry the plan builder never sees, so without one it says": "  loading order from geometry this adapter never sees, so without one it says",
+		"  plan builder re-derived behind your back.":                                       "  adapter re-derived behind your back.",
 		"4. One plan, every engine, the same bytes":                                         "4. One plan, four engines, the same bytes",
-		"  Hand the same *result* to any Packvium adapter, this one included, and it emits": "  Hand the same *result* to all four adapters and they emit the same bytes. That",
+		"  Hand the same *result* to the plan builder of any Packvium engine and it emits":  "  Hand the same *result* to all four adapters and they emit the same bytes. That",
 		"  the same bytes. That is stricter than the packing contract, and it can be: a":    "  is stricter than the packing contract, and it can be: a plan is derived from a",
 		"  plan is derived from a result, so there is nothing left to differ about.":        "  result, so there is nothing left to differ about.",
-		"  It does not follow that every engine packing the same *request* agrees. This":    "  It does not follow that four engines packing the same *request* agree. Python",
-		"  engine, like Python and PHP, is held to identical placements and produces this":  "  and PHP are held to identical placements and do produce this exact form; Rust",
-		"  exact form; the Rust and JavaScript engines are held to a valid answer at or":    "  and JavaScript are held to a valid answer at or above the objective floor, and",
-		"  above the objective floor, so their plan for this request can be a different":    "  `examples/execution.mjs` prints 1280 bytes here rather than 1877 for that",
-		"  length. Whose packing is better is a question the plan never answers.":           "  reason. Whose packing is better is a question the plan never answers.",
-		"  preserved: true":                      "  preserved: True",
-		"  the approved plan is untouched: true": "  the approved plan is untouched: True",
-		"  a lock the solve cannot honour -> preserved=false, 1 lock reported back": "  a lock the solve cannot honour -> preserved=False, 1 lock reported back",
+		"  It does not follow that every engine packing the same *request* agrees. Python,": "  It does not follow that four engines packing the same *request* agree. Python",
+		"  PHP, Java, .NET and Go return identical results at the same version; Rust and":   "  and PHP are held to identical placements and do produce this exact form; Rust",
+		"  JavaScript return a valid answer at or above the objective floor, so their plan": "  and JavaScript are held to a valid answer at or above the objective floor, and",
+		"  for this request can be a different length. Whose packing is better is a":        "  `examples/execution.mjs` prints 1280 bytes here rather than 1877 for that",
+		"  question the plan never answers.":                                                "  reason. Whose packing is better is a question the plan never answers.",
+		"  preserved: true":                                                                 "  preserved: True",
+		"  the approved plan is untouched: true":                                            "  the approved plan is untouched: True",
+		"  a lock the solve cannot honour -> preserved=false, 1 lock reported back":         "  a lock the solve cannot honour -> preserved=False, 1 lock reported back",
 	},
 	"errors": {
 		"  Both are errors, so a handler that ends with a plain `err != nil` still turns":     "  Both are `ValueError`s, so a handler that ends with `except ValueError` still turns",

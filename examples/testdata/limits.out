@@ -24,9 +24,9 @@
 ==============================================================================
   status: best_found
     reefer-van#1   2 frozen-tote, 1 lithium-battery, 23 parcel
-    left out: 1 frozen-tote, no_feasible_placement (observed)
-    left out: 2 lithium-battery, no_feasible_placement (observed)
-    left out: 1 parcel, no_feasible_placement (observed)
+    left out: 1 frozen-tote, container_inventory_exhausted (inferred)
+    left out: 2 lithium-battery, container_inventory_exhausted (inferred)
+    left out: 1 parcel, container_inventory_exhausted (inferred)
 
   The cap is honoured, and what does not fit is listed rather than silently sent in
   a vehicle you did not allow. The reason is `observed`, not `proven`: the search
@@ -40,8 +40,8 @@
     cargo-bike#2   4 parcel
     cargo-bike#3   4 parcel
     left out: 3 frozen-tote, no_eligible_container (proven)
-    left out: 3 lithium-battery, no_feasible_placement (observed)
-    left out: 12 parcel, no_feasible_placement (observed)
+    left out: 3 lithium-battery, container_inventory_exhausted (inferred)
+    left out: 12 parcel, container_inventory_exhausted (inferred)
 
   The frozen totes cannot go anywhere, and their reason is `proven`: no container in
   the request carries the tag they need, which is a fact about the request rather

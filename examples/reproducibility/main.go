@@ -157,7 +157,7 @@ func main() {
 		"  is `configuration.effort_budget`.")
 }
 
-// pythonBool keeps the column the reference prints, True or False.
+// pythonBool spells a boolean True or False, the shared notation.
 func pythonBool(value bool) string {
 	if value {
 		return "True"

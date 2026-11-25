@@ -23,12 +23,24 @@ import (
 // extents. Both the deadline and containerPlanNodeLimit bound the product explicitly.
 type HomogeneousBlockSolver struct {
 	constraints []constraint.PlacementConstraint
+	modes       []blockMode
+	// nodeLimit replaces the configuration's containerPlanNodeLimit when set: fast and
+	// balanced leave that at one, which would stop the lattice enumeration before its first
+	// block, so the block start they add carries its own bound.
+	nodeLimit *int64
 }
 
 // NewHomogeneousBlockSolver falls back to the extreme-point beam whenever constraints is not
 // empty.
 func NewHomogeneousBlockSolver(constraints []constraint.PlacementConstraint) *HomogeneousBlockSolver {
-	return &HomogeneousBlockSolver{append([]constraint.PlacementConstraint(nil), constraints...)}
+	return &HomogeneousBlockSolver{constraints: append([]constraint.PlacementConstraint(nil), constraints...),
+		modes: []blockMode{countMode, volumeMode}}
+}
+
+// newBoundedBlockSolver is the block start fast and balanced add: the given modes, and its
+// own lattice node bound per mode.
+func newBoundedBlockSolver(modes []blockMode, nodeLimit int64) *HomogeneousBlockSolver {
+	return &HomogeneousBlockSolver{modes: modes, nodeLimit: &nodeLimit}
 }
 
 func (*HomogeneousBlockSolver) Name() string           { return "homogeneous_blocks" }
@@ -41,23 +53,31 @@ const (
 	volumeMode
 )
 
-// PackOne keeps the better of a count-first and a volume-first block search.
+// PackOne keeps the best of its modes' block searches: count first and volume first.
 func (s *HomogeneousBlockSolver) PackOne(container *domain.Container, sequence int64, items []domain.ItemInstance,
 	cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline) SingleContainerSolution {
 	if !s.supports(container, items, cfg) {
 		return NewExtremePointSolver(s.constraints, DefaultCandidateScorer{}).PackOne(container, sequence, items, cfg,
 			stats, deadline)
 	}
+	nodeLimit := cfg.ContainerPlanNodeLimit()
+	if s.nodeLimit != nil {
+		nodeLimit = *s.nodeLimit
+	}
+	byVolume := ranksByVolume(cfg)
 	var best *SingleContainerSolution
 	reached := false
-	for _, mode := range []blockMode{countMode, volumeMode} {
+	// Group enumerations are pure arithmetic, so the second mode and every later round reuse
+	// them (see blockLattice).
+	lattices := map[latticeKey]latticeSummary{}
+	for _, mode := range s.modes {
 		if deadline.Expired() {
 			reached = true
 			break
 		}
-		solution := packBlocks(container, sequence, items, cfg, stats, deadline, mode)
+		solution := packBlocks(container, sequence, items, cfg, stats, deadline, mode, nodeLimit, lattices)
 		reached = reached || solution.TimeLimitReached
-		if best == nil || blockSolutionKey(solution).Compare(blockSolutionKey(*best)) < 0 {
+		if best == nil || blockSolutionKey(solution, byVolume).Compare(blockSolutionKey(*best, byVolume)) < 0 {
 			kept := solution
 			best = &kept
 		}
@@ -72,7 +92,7 @@ func (s *HomogeneousBlockSolver) PackOne(container *domain.Container, sequence i
 func (s *HomogeneousBlockSolver) supports(container *domain.Container, items []domain.ItemInstance,
 	cfg *config.PackingConfig) bool {
 	if len(s.constraints) > 0 || len(container.Obstacles()) > 0 || container.HasPreloaded() || container.Axles() != nil ||
-		cfg.MinimumSupportRatio() > 0 ||
+		cfg.MinimumSupportRatio() > 0 || container.IsFlatBag() ||
 		len(container.TagLimitNames()) > 0 || container.MaxStackDensity() != nil || container.VoidFillReserveRatio() > 0 {
 		return false
 	}
@@ -89,10 +109,17 @@ func unrestricted(item *domain.Item) bool {
 	return item.ShapeType() == domain.RigidCuboid && item.Group() == nil && item.Tags().Len() == 0 && item.IncompatibleTags().Len() == 0 &&
 		item.EligibleContainerTags().Len() == 0 && item.Stackable() && !item.MustBeOnFloor() &&
 		item.MaxTopLoad() == nil && item.MaxStackedItems() == nil && item.MinimumSupportRatio() == 0.0 &&
-		(rule == nil || *rule == "free") && item.NestingHeight() == nil && item.StopIndex() == nil
+		(rule == nil || *rule == "free") && item.NestingHeight() == nil && item.StopIndex() == nil &&
+		// Block-on-block contacts would need a second implementation of the stacking-group
+		// rule; the general solver already walks every edge.
+		item.AcceptsStackingGroups().Len() == 0
 }
 
-func blockSolutionKey(solution SingleContainerSolution) SortKey {
+func blockSolutionKey(solution SingleContainerSolution, byVolume bool) SortKey {
+	if byVolume {
+		return SortKey{Big(negated(solution.State.UsedVolume)), Int(int64(len(solution.Unpacked))),
+			Int(solution.State.MaxZ), Str(solution.State.PlacementSignature())}
+	}
 	return SortKey{Int(int64(len(solution.Unpacked))), Big(negated(solution.State.UsedVolume)),
 		Int(solution.State.MaxZ), Str(solution.State.PlacementSignature())}
 }
@@ -134,10 +161,6 @@ func (r *remainingByType) all() []domain.ItemInstance {
 	return out
 }
 
-// searchCut is the node limit or the deadline cutting the enumeration; the incumbent of that
-// round is dropped.
-type searchCut struct{}
-
 type block struct {
 	space              Space
 	itemID             string
@@ -145,17 +168,24 @@ type block struct {
 	physical, envelope domain.Dimensions
 	nx, ny, nz, count  int64
 	score              SortKey
+	// lead is -count, the count mode's first key field, kept to skip losing groups cheaply.
+	lead int64
 }
 
 func packBlocks(container *domain.Container, sequence int64, items []domain.ItemInstance, cfg *config.PackingConfig,
-	stats *SearchStats, deadline *Deadline, mode blockMode) SingleContainerSolution {
+	stats *SearchStats, deadline *Deadline, mode blockMode, nodeLimit int64,
+	lattices map[latticeKey]latticeSummary) SingleContainerSolution {
 	state := NewContainerState(container, sequence)
 	spaces := []Space{{domain.Point{}, container.InnerDimensions()}}
 	remaining := newRemainingByType(items)
-	nodes := int64(0)
+	forms := map[string][]blockForm{}
+	for _, id := range remaining.ids {
+		forms[id] = blockForms(remaining.instances[id][0], cfg)
+	}
+	round := blockRound{container, state, cfg, stats, deadline, mode, nodeLimit, lattices, 0}
 	reached := false
 	for len(spaces) > 0 && remaining.any() {
-		best, cut := bestBlockOrCut(container, state, spaces, remaining, cfg, stats, deadline, mode, &nodes)
+		best, cut := round.next(spaces, remaining, forms)
 		if cut {
 			reached = true
 			break
@@ -174,91 +204,167 @@ func packBlocks(container *domain.Container, sequence int64, items []domain.Item
 	return SingleContainerSolution{State: state, Unpacked: remaining.all(), TimeLimitReached: reached || deadline.Expired()}
 }
 
-func bestBlockOrCut(container *domain.Container, state *ContainerState, spaces []Space, remaining *remainingByType,
-	cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline, mode blockMode, nodes *int64) (best *block, cut bool) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			if _, ok := recovered.(searchCut); !ok {
-				panic(recovered)
-			}
-			best, cut = nil, true
-		}
-	}()
-	return bestBlock(container, state, spaces, remaining, cfg, stats, deadline, mode, nodes), false
+// blockForm is one unique rotation of a type with its envelope and physical volume.
+type blockForm struct {
+	rotation           domain.Rotation
+	physical, envelope domain.Dimensions
+	volume             *big.Int
 }
 
-func bestBlock(container *domain.Container, state *ContainerState, spaces []Space, remaining *remainingByType,
-	cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline, mode blockMode, nodes *int64) *block {
+func blockForms(prototype domain.ItemInstance, cfg *config.PackingConfig) []blockForm {
+	var forms []blockForm
+	for _, oriented := range prototype.Item().Dimensions().UniqueRotations(prototype.Item().AllowedRotations()) {
+		envelope := oriented.Dimensions
+		if cfg.Clearance().Ticks() != 0 {
+			envelope = envelope.Expand(cfg.Clearance())
+		}
+		forms = append(forms, blockForm{oriented.Rotation, oriented.Dimensions, envelope, oriented.Dimensions.Volume()})
+	}
+	return forms
+}
+
+// latticeMemoLimit is the distinct group shapes one block solve remembers. The memo only
+// saves arithmetic, so a full one is simply not added to.
+const latticeMemoLimit = 4096
+
+type latticeKey struct{ columns, rows, layers, capacity int64 }
+
+// latticeSummary is one group's node count and its first largest block in (nx, ny) order.
+type latticeSummary struct{ nodes, count, nx, ny, nz int64 }
+
+// blockLattice summarises one (space, type, rotation) group's (nx, ny) enumeration: nx in
+// 1..columns, ny in 1..min(rows, capacity / nx), every node counted whether or not it has a
+// layer. Within a group every key field but the lead is equal and the lead improves strictly
+// with the count in both modes, so the first largest count is the only node that can win.
+// The answer depends on these four integers alone, which is what lets it be memoised.
+// O(columns * rows) time, O(1) space.
+func blockLattice(key latticeKey) latticeSummary {
+	var summary latticeSummary
+	for nx := int64(1); nx <= key.columns; nx++ {
+		maximumNY := ints.Min(key.rows, key.capacity/nx)
+		summary.nodes += maximumNY
+		for ny := int64(1); ny <= maximumNY; ny++ {
+			nz := ints.Min(key.layers, key.capacity/(nx*ny))
+			if nz > 0 && nx*ny*nz > summary.count {
+				summary.count, summary.nx, summary.ny, summary.nz = nx*ny*nz, nx, ny, nz
+			}
+		}
+	}
+	return summary
+}
+
+// blockRound is one mode's search state across its rounds: the node count it has spent.
+type blockRound struct {
+	container *domain.Container
+	state     *ContainerState
+	cfg       *config.PackingConfig
+	stats     *SearchStats
+	deadline  *Deadline
+	mode      blockMode
+	nodeLimit int64
+	lattices  map[latticeKey]latticeSummary
+	nodes     int64
+}
+
+// capacity is how many of a type one block may still take: stock, item limit and payload.
+func (r *blockRound) capacity(available []domain.ItemInstance) int64 {
+	capacity := int64(len(available))
+	if limit := r.container.MaxItems(); limit != nil {
+		capacity = ints.Min(capacity, *limit-r.state.PlacementCount())
+	}
+	if payload := r.container.MaxPayload(); payload != nil && available[0].Item().Weight().Ticks() > 0 {
+		capacity = ints.Min(capacity, (payload.Ticks()-r.state.PayloadTicks)/available[0].Item().Weight().Ticks())
+	}
+	return capacity
+}
+
+// next is one round's winning block, or cut when a limit stopped the round, which then
+// commits nothing. A group's nodes are counted at once: its first node polls the deadline as
+// a per-node loop would, and a counted limit falling inside the group is charged exactly the
+// nodes such a loop would have expanded before stopping. O(S * T * R) groups per round, each
+// O(X * Y) on a memo miss.
+func (r *blockRound) next(spaces []Space, remaining *remainingByType, forms map[string][]blockForm) (*block, bool) {
+	ceiling := r.deadline.searchNodeCeiling(r.stats)
+	type eligible struct {
+		id       string
+		capacity int64
+	}
+	// Capacity reads only the committed state, so it is fixed for the whole round.
+	var types []eligible
+	for _, id := range remaining.ids {
+		if available := remaining.instances[id]; len(available) > 0 {
+			if capacity := r.capacity(available); capacity > 0 {
+				types = append(types, eligible{id, capacity})
+			}
+		}
+	}
 	var best *block
 	for _, space := range spaces {
-		spaceVolume := space.Dimensions.Volume()
-		for _, id := range remaining.ids {
-			available := remaining.instances[id]
-			if len(available) == 0 {
-				continue
-			}
-			prototype := available[0]
-			capacity := int64(len(available))
-			if limit := container.MaxItems(); limit != nil {
-				capacity = ints.Min(capacity, *limit-state.PlacementCount())
-			}
-			if payload := container.MaxPayload(); payload != nil && prototype.Item().Weight().Ticks() > 0 {
-				capacity = ints.Min(capacity, (payload.Ticks()-state.PayloadTicks)/prototype.Item().Weight().Ticks())
-			}
-			if capacity <= 0 {
-				continue
-			}
-			for _, oriented := range prototype.Item().Dimensions().UniqueRotations(prototype.Item().AllowedRotations()) {
-				best = bestInRotation(best, space, spaceVolume, id, oriented, capacity, cfg, stats, deadline, mode, nodes)
+		length, width, height := space.Dimensions.Length().Ticks(), space.Dimensions.Width().Ticks(),
+			space.Dimensions.Height().Ticks()
+		for _, candidate := range types {
+			for _, form := range forms[candidate.id] {
+				columns := ints.Min(length/form.envelope.Length().Ticks(), candidate.capacity)
+				rows := width / form.envelope.Width().Ticks()
+				if columns == 0 || rows == 0 {
+					continue
+				}
+				if r.nodes >= r.nodeLimit || r.deadline.Expired() {
+					return best, true
+				}
+				key := latticeKey{columns, rows, height / form.envelope.Height().Ticks(), candidate.capacity}
+				summary, known := r.lattices[key]
+				if !known {
+					summary = blockLattice(key)
+					if len(r.lattices) < latticeMemoLimit {
+						r.lattices[key] = summary
+					}
+				}
+				budget := r.nodeLimit - r.nodes
+				if ceiling != nil {
+					budget = ints.Min(budget, *ceiling-r.stats.SearchNodesExpanded)
+				}
+				if summary.nodes > budget {
+					r.stats.SearchNodesExpanded += budget
+					r.nodes += budget
+					return best, true
+				}
+				r.nodes += summary.nodes
+				r.stats.SearchNodesExpanded += summary.nodes
+				if summary.count > 0 {
+					best = r.better(best, space, candidate.id, form, summary)
+				}
 			}
 		}
 	}
-	return best
+	return best, false
 }
 
-func bestInRotation(incumbent *block, space Space, spaceVolume *big.Int, itemID string,
-	oriented domain.OrientedDimensions, capacity int64, cfg *config.PackingConfig, stats *SearchStats,
-	deadline *Deadline, mode blockMode, nodes *int64) *block {
-	best := incumbent
-	physical := oriented.Dimensions
-	envelope := physical
-	if cfg.Clearance().Ticks() != 0 {
-		envelope = physical.Expand(cfg.Clearance())
-	}
-	maximumX := space.Dimensions.Length().Ticks() / envelope.Length().Ticks()
-	maximumY := space.Dimensions.Width().Ticks() / envelope.Width().Ticks()
-	maximumZ := space.Dimensions.Height().Ticks() / envelope.Height().Ticks()
-	physicalVolume := physical.Volume()
-	for nx := int64(1); nx <= ints.Min(maximumX, capacity); nx++ {
-		maximumNY := ints.Min(maximumY, capacity/nx)
-		for ny := int64(1); ny <= maximumNY; ny++ {
-			if *nodes >= cfg.ContainerPlanNodeLimit() || deadline.Expired() {
-				panic(searchCut{})
-			}
-			*nodes++
-			stats.SearchNodesExpanded++
-			nz := ints.Min(maximumZ, capacity/(nx*ny))
-			if nz <= 0 {
-				continue
-			}
-			count := nx * ny * nz
-			usedVolume := new(big.Int).Mul(big.NewInt(count), physicalVolume)
-			fill := new(big.Int).Mul(usedVolume, scorePPM)
-			spaceFill := exactInt64(fill.Quo(fill, spaceVolume))
-			var score SortKey
-			if mode == countMode {
-				score = SortKey{Int(-count), Int(-spaceFill), Big(negated(usedVolume))}
-			} else {
-				score = SortKey{Big(negated(usedVolume)), Int(-spaceFill), Int(-count)}
-			}
-			score = append(score, Int(space.Origin.Z()), Int(space.Origin.Y()), Int(space.Origin.X()), Str(itemID),
-				Str(string(oriented.Rotation)), Int(nx), Int(ny), Int(nz))
-			if best == nil || score.Compare(best.score) < 0 {
-				best = &block{space, itemID, oriented.Rotation, physical, envelope, nx, ny, nz, count, score}
-			}
+// better is best, or this group's winning block when its key ranks strictly ahead.
+func (r *blockRound) better(best *block, space Space, itemID string, form blockForm, summary latticeSummary) *block {
+	count := summary.count
+	usedVolume := new(big.Int).Mul(big.NewInt(count), form.volume)
+	// The key's first field is -count or -used volume; a group that loses on it loses.
+	if best != nil {
+		if r.mode == countMode && -count > best.lead {
+			return best
 		}
 	}
-	return best
+	fill := new(big.Int).Mul(usedVolume, scorePPM)
+	spaceFill := exactInt64(fill.Quo(fill, space.Dimensions.Volume()))
+	var score SortKey
+	if r.mode == countMode {
+		score = SortKey{Int(-count), Int(-spaceFill), Big(negated(usedVolume))}
+	} else {
+		score = SortKey{Big(negated(usedVolume)), Int(-spaceFill), Int(-count)}
+	}
+	score = append(score, Int(space.Origin.Z()), Int(space.Origin.Y()), Int(space.Origin.X()), Str(itemID),
+		Str(string(form.rotation)), Int(summary.nx), Int(summary.ny), Int(summary.nz))
+	if best != nil && score.Compare(best.score) >= 0 {
+		return best
+	}
+	return &block{space, itemID, form.rotation, form.physical, form.envelope, summary.nx, summary.ny, summary.nz,
+		count, score, -count}
 }
 
 func commitBlock(state *ContainerState, chosen *block, instances []domain.ItemInstance, cfg *config.PackingConfig,

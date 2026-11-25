@@ -26,8 +26,9 @@ func BeamPack(container *domain.Container, sequence int64, items []domain.ItemIn
 	scorer CandidateScorer) SingleContainerSolution {
 	branchWidth := int(ints.Max(1, cfg.MaxCandidatesPerItem()))
 	width := ints.Max(1, cfg.ContainerPlanBeamWidth())
+	byVolume := ranksByVolume(cfg)
 	if width == 1 {
-		return packLegacy(container, sequence, items, cfg, constraints, stats, deadline, scorer, branchWidth)
+		return packLegacy(container, sequence, items, cfg, constraints, stats, deadline, scorer, branchWidth, byVolume)
 	}
 	nodeLimit, nodes := cfg.ContainerPlanNodeLimit(), int64(0)
 	batches := Batches(items)
@@ -35,8 +36,7 @@ func BeamPack(container *domain.Container, sequence int64, items []domain.ItemIn
 	incumbent := greedyRollout(container, sequence, batches, cfg, constraints, stats, deadline, scorer)
 	// nodeKey builds an O(m) placement signature and a knapsack bound; computing it once per
 	// node instead of once per comparison changes no ordering.
-	incumbentKey := nodeKey(incumbent, futureCosts{})
-	incumbentUnplaced := int64(len(incumbent.unplaced))
+	incumbentKey := nodeKey(incumbent, futureCosts{}, byVolume)
 	for position, batch := range batches {
 		var expansions []beamNode
 		exhausted := false
@@ -63,36 +63,36 @@ func BeamPack(container *domain.Container, sequence int64, items []domain.ItemIn
 			// The key of the expansion with every later batch left unplaced, built without the
 			// concatenation unless it wins.
 			unplaced := int64(len(expansion.unplaced) + len(future))
-			// More unplaced items loses on the key's first component whatever follows, so the
-			// signature -- the costly O(m) part -- is built only for a candidate that can win.
-			if unplaced > incumbentUnplaced {
+			// A worse leading component loses whatever follows, so the signature -- the
+			// costly O(m) part -- is built only for a candidate that can win.
+			if !leadCanWin(expansion.state, unplaced, incumbentKey, byVolume) {
 				continue
 			}
-			candidateKey := stateKey(expansion.state, unplaced, unplaced)
+			candidateKey := completedKey(expansion.state, unplaced, byVolume)
 			if candidateKey.Compare(incumbentKey) < 0 {
 				incumbent = beamNode{expansion.state, concatInstances(expansion.unplaced, future)}
-				incumbentKey, incumbentUnplaced = candidateKey, unplaced
+				incumbentKey = candidateKey
 			}
 		}
 		if len(expansions) == 0 {
 			break
 		}
-		beam = firstNodes(sortNodes(expansions, newFutureCosts(future, container.MaxPayload() != nil)), width)
+		beam = firstNodes(sortNodes(expansions, newFutureCosts(future, container.MaxPayload() != nil), byVolume), width)
 		if exhausted {
 			return SingleContainerSolution{State: incumbent.state, Unpacked: incumbent.unplaced,
 				TimeLimitReached: deadline.Expired()}
 		}
 	}
-	ordered := sortNodes(beam, futureCosts{})
+	ordered := sortNodes(beam, futureCosts{}, byVolume)
 	chosen := incumbent
-	if len(ordered) > 0 && nodeKey(ordered[0], futureCosts{}).Compare(incumbentKey) < 0 {
+	if len(ordered) > 0 && nodeKey(ordered[0], futureCosts{}, byVolume).Compare(incumbentKey) < 0 {
 		chosen = ordered[0]
 	}
 	return plainSolution(chosen.state, chosen.unplaced)
 }
 
-func sortNodes(nodes []beamNode, future futureCosts) []beamNode {
-	order := stableOrder(len(nodes), func(index int) SortKey { return nodeKey(nodes[index], future) })
+func sortNodes(nodes []beamNode, future futureCosts, byVolume bool) []beamNode {
+	order := stableOrder(len(nodes), func(index int) SortKey { return nodeKey(nodes[index], future, byVolume) })
 	out := make([]beamNode, len(nodes))
 	for position, index := range order {
 		out[position] = nodes[index]
@@ -135,7 +135,7 @@ func greedyRollout(container *domain.Container, sequence int64, batches [][]doma
 // would only double work at plan width one, so the low-latency path stays separate.
 func packLegacy(container *domain.Container, sequence int64, items []domain.ItemInstance, cfg *config.PackingConfig,
 	constraints []constraint.PlacementConstraint, stats *SearchStats, deadline *Deadline, scorer CandidateScorer,
-	width int) SingleContainerSolution {
+	width int, byVolume bool) SingleContainerSolution {
 	batches := Batches(items)
 	beam := []beamNode{{NewContainerState(container, sequence), nil}}
 	for position, batch := range batches {
@@ -156,7 +156,7 @@ func packLegacy(container *domain.Container, sequence int64, items []domain.Item
 				expansions = append(expansions, beamNode{child, node.unplaced})
 			}
 		}
-		beam = firstNodes(sortNodes(expansions, futureCosts{}), int64(width))
+		beam = firstNodes(sortNodes(expansions, futureCosts{}, byVolume), int64(width))
 		if exhausted {
 			best := beam[0]
 			pending := Flatten(batches[position+1:])
@@ -228,7 +228,9 @@ func newFutureCosts(future []domain.ItemInstance, payloadLimited bool) futureCos
 	if !nesting {
 		volumes := make([]*big.Int, len(future))
 		for index, item := range future {
-			volumes[index] = item.Item().Dimensions().Volume()
+			// Occupied, not declared: the free space these are compared with is occupied
+			// volume, and two wedges each declaring the whole crate both fit in it.
+			volumes[index] = domain.ItemOccupiedVolume(item)
 		}
 		sort.Slice(volumes, func(i, j int) bool { return volumes[i].Cmp(volumes[j]) < 0 })
 		for index := 1; index < len(volumes); index++ {
@@ -288,9 +290,52 @@ func unpackedLowerBound(state *ContainerState, unplaced int64, future futureCost
 	return unplaced + future.count - possible
 }
 
-func nodeKey(node beamNode, future futureCosts) SortKey {
+// reachableVolume is an upper bound on the volume this node can still end with: what is
+// placed, plus the future items' total volume capped by the free space. For nesting, nominal
+// volumes are not additive, so the free space alone is the bound.
+func reachableVolume(state *ContainerState, future futureCosts) *big.Int {
+	if future.count == 0 {
+		return state.UsedVolume
+	}
+	free := new(big.Int).Sub(state.Container.InnerDimensions().Volume(), state.UsedVolume)
+	if free.Sign() < 0 {
+		free.SetInt64(0)
+	}
+	if future.volumes != nil {
+		if total := future.volumes[len(future.volumes)-1]; total.Cmp(free) < 0 {
+			free.Set(total)
+		}
+	}
+	return free.Add(free, state.UsedVolume)
+}
+
+// nodeKey ranks a beam node: by the unpacked lower bound, or under maximum_volume by the
+// volume it can still reach.
+func nodeKey(node beamNode, future futureCosts, byVolume bool) SortKey {
 	unplaced := int64(len(node.unplaced))
+	if byVolume {
+		return SortKey{Big(negated(reachableVolume(node.state, future))), Big(negated(node.state.UsedVolume)),
+			Int(unplaced), Int(node.state.MaxZ), Str(node.state.PlacementSignature())}
+	}
 	return stateKey(node.state, unpackedLowerBound(node.state, unplaced, future), unplaced)
+}
+
+// completedKey is the node key of a state with unplaced items left and no future.
+func completedKey(state *ContainerState, unplaced int64, byVolume bool) SortKey {
+	if byVolume {
+		used := Big(negated(state.UsedVolume))
+		return SortKey{used, used, Int(unplaced), Int(state.MaxZ), Str(state.PlacementSignature())}
+	}
+	return stateKey(state, unplaced, unplaced)
+}
+
+// leadCanWin reports whether a completed state's leading key field does not already lose to
+// the incumbent's.
+func leadCanWin(state *ContainerState, unplaced int64, incumbent SortKey, byVolume bool) bool {
+	if byVolume {
+		return SortKey{Big(negated(state.UsedVolume))}.Compare(incumbent[:1]) <= 0
+	}
+	return SortKey{Int(unplaced)}.Compare(incumbent[:1]) <= 0
 }
 
 func stateKey(state *ContainerState, bound, unplaced int64) SortKey {

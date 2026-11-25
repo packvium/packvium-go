@@ -29,8 +29,8 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
       - run: go vet ./...
-      # Runs the unit tests and every example in examples/; the corpus tests skip outside
-      # the Packvium suite repository and say why.
+      # Runs the unit tests and every example in examples/; the conformance-corpus tests need
+      # the shared corpus, which is not in this repository, so they skip and say why.
       - run: go test ./...
       - name: CLI smoke test
         shell: bash

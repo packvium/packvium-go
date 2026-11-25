@@ -83,6 +83,18 @@ func encodeContainer(packed *domain.PackedContainer, lengthUnit, weightUnit stri
 		"void_fill_reserve_ticks3":  constraint.ReservedVolume(container).String(),
 		"placements":                placements,
 	}
+	// Present exactly when the container conforms to its contents, so a rigid
+	// container's bytes are unchanged.
+	if achieved := packed.AchievedDimensions(); achieved != nil {
+		out["achieved_dimensions"] = achieved.ToMap(lengthUnit)
+	}
+	// A packed made-to-measure container is the fabricated box, so its own price and tare are
+	// the box's; absent for every other container.
+	if container.MadeToMeasure() != nil {
+		out["made_to_measure"] = map[string]interface{}{
+			"cost_minor": container.CostMinor(), "tare_weight": container.TareWeight().ToMap(weightUnit),
+		}
+	}
 	if summary := packed.LatticeSummary(); summary != nil {
 		out["lattice_summary"] = map[string]interface{}{
 			"item_type": summary.ItemType, "orientation": string(summary.Rotation),

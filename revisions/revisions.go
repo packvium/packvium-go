@@ -1,5 +1,5 @@
-// Package revisions is packvium.revisions: plan revisions, an append-only chain of exceptions
-// against approved plans (docs/PLAN-REVISIONS.md).
+// Package revisions is plan revisions: an append-only chain of exceptions against approved
+// plans.
 //
 // A revision records what differed from an approved plan (a missing item, a substituted
 // carton, a lock, a verified placement) and derives the request the next plan solves. It is a

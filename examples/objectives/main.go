@@ -1,4 +1,5 @@
-// Objectives: six ways to be "best", and the scenes where they disagree.
+// Objectives: six of the seven objectives (all but `maximum_volume`), and the loads where
+// they disagree.
 //
 // Run it from packvium-go/:
 //
@@ -6,12 +7,12 @@
 //
 // Every solve returns the arrangement that scores best -- but "best" is a choice, and it is
 // the one setting most likely to make the library look wrong when it is merely answering a
-// different question than you meant to ask. This example builds scenes where two objectives
+// different question than you meant to ask. This example builds loads where two objectives
 // genuinely pick different containers, so the difference is visible rather than asserted.
 //
-// The score is always a lexicographic vector of exact integers, never a float, and its
-// first key is always unpacked_count: no objective will ever leave an item behind to save
-// money. Ratios are parts per million.
+// The score is always a lexicographic vector of exact integers, never a float. For the six
+// shown here its first key is unpacked_count, so none will leave an item behind to save
+// money; `maximum_volume` leads with the share of the requested volume left behind instead. Ratios are parts per million.
 package main
 
 import (
@@ -102,7 +103,8 @@ func solve(options config.Options, items []*domain.Item, containers []*domain.Co
 	return outcome
 }
 
-// describe prints the chosen container and the score as the reference prints a tuple.
+// describe prints the chosen container, and the score in Python's tuple notation, which
+// every Packvium language's output shares.
 func describe(outcome *result.PackingResult) string {
 	chosen := "none"
 	if len(outcome.Containers) > 0 {

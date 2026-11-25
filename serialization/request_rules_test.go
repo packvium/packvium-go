@@ -243,3 +243,88 @@ func TestAPolicyIsRefusedBeforeAnItemAsTheReferenceOrdersThem(t *testing.T) {
 		t.Fatal("the two refusals cannot be told apart")
 	}
 }
+
+func sidesOf(length, width, height string) map[string]interface{} {
+	return map[string]interface{}{"length": length, "width": width, "height": height}
+}
+
+func machine(fields map[string]interface{}) map[string]interface{} {
+	spec := map[string]interface{}{"minimum": sidesOf("50", "50", "50"), "increment": sidesOf("10", "10", "10")}
+	for key, value := range fields {
+		spec[key] = value
+	}
+	return spec
+}
+
+// The 1.6 fields, refused in the reference's order with its code, reason, field and message.
+func TestTheNewFieldsAreRefusedAsTheReferenceRefusesThem(t *testing.T) {
+	bag := map[string]interface{}{"kind": "flat_bag"}
+	cases := []struct {
+		edit                  func(map[string]interface{})
+		reason, field, detail string
+	}{
+		{setItem("stacking_group", int64(1)), "wrong_type", "/items/0/stacking_group", "must be a string"},
+		{setItem("stacking_group", ""), "invalid_value", "/items/0/stacking_group", "must not be empty"},
+		{setItem("accepts_stacking_groups", "A"), "wrong_type", "/items/0/accepts_stacking_groups", "must be a list"},
+		{setItem("accepts_stacking_groups", []interface{}{"A", ""}), "invalid_value",
+			"/items/0/accepts_stacking_groups/1", "must not be empty"},
+		{setContainer("deformable_boundary", map[string]interface{}{"kind": "sack"}), "not_allowed",
+			"/containers/0/deformable_boundary/kind", `must be one of ["flat_bag"]`},
+		{setContainer("deformable_boundary", map[string]interface{}{}), "missing_field",
+			"/containers/0/deformable_boundary/kind", "is required"},
+		{setContainer("deformable_boundary", map[string]interface{}{"kind": "flat_bag", "seal": true}), "not_allowed",
+			"/containers/0/deformable_boundary/seal", "is not a known field"},
+		{func(r map[string]interface{}) {
+			firstContainer(r)["deformable_boundary"] = bag
+			firstContainer(r)["access_directions"] = []interface{}{"+x"}
+		}, "not_allowed", "/containers/0/access_directions", "cannot be combined with deformable_boundary"},
+		{func(r map[string]interface{}) {
+			firstContainer(r)["deformable_boundary"] = bag
+			firstContainer(r)["made_to_measure"] = machine(nil)
+		}, "not_allowed", "/containers/0/made_to_measure", "cannot be combined with deformable_boundary"},
+		{setContainer("made_to_measure", map[string]interface{}{"minimum": sidesOf("50", "50", "50")}),
+			"missing_field", "/containers/0/made_to_measure/increment", "is required"},
+		{setContainer("made_to_measure", machine(map[string]interface{}{"blade": int64(1)})), "not_allowed",
+			"/containers/0/made_to_measure/blade", "is not a known field"},
+		{setContainer("made_to_measure", machine(map[string]interface{}{"minimum": sidesOf("0", "50", "50")})),
+			"invalid_value", "/containers/0/made_to_measure/minimum/length", "must be positive"},
+		{setContainer("made_to_measure", machine(map[string]interface{}{"minimum": sidesOf("50", "300", "50")})),
+			"invalid_value", "/containers/0/made_to_measure/minimum/width", "exceeds inner_dimensions"},
+		{setContainer("made_to_measure", machine(map[string]interface{}{"increment": sidesOf("10", "10", "7")})),
+			"invalid_value", "/containers/0/made_to_measure/increment/height",
+			"does not divide inner_dimensions minus minimum"},
+		{func(r map[string]interface{}) {
+			firstContainer(r)["made_to_measure"] = machine(map[string]interface{}{"cost_per_square_metre_minor": int64(1)})
+			firstContainer(r)["cost_minor"] = int64(1)<<53 - 1
+		}, "invalid_value", "/containers/0/made_to_measure/cost_per_square_metre_minor",
+			"prices the largest box above 9007199254740991"},
+		{func(r map[string]interface{}) {
+			firstContainer(r)["made_to_measure"] = machine(nil)
+			firstContainer(r)["outer_dimensions"] = sidesOf("300", "200", "300")
+		}, "not_allowed", "/containers/0/outer_dimensions", "cannot be combined with made_to_measure"},
+		{func(r map[string]interface{}) {
+			r["configuration"].(map[string]interface{})["objective"] = "maximum_area"
+		}, "not_allowed", "/configuration/objective",
+			`must be one of ["default","lowest_cost","shipping_cost","lowest_landed_cost","open_dimension_height","maximum_value","maximum_volume"]`},
+	}
+	for _, testCase := range cases {
+		refusal := refusalOf(t, testCase.edit)
+		if refusal.Reason != testCase.reason || refusal.Field != testCase.field || refusal.Detail != testCase.detail {
+			t.Errorf("%s: %#v", testCase.field, refusal)
+		}
+	}
+}
+
+// A made-to-measure machine with axles, obstacles, a reserve or a fixed placement is refused
+// as an unsupported feature on the raw request, before any request error.
+func TestAMadeToMeasureCombinationIsAnUnsupportedFeature(t *testing.T) {
+	request := validRequest()
+	firstContainer(request)["made_to_measure"] = machine(nil)
+	firstContainer(request)["void_fill_reserve_ratio"] = 0.1
+	firstItem(request)["quantity"] = "not a number"
+	_, err := Pack(request)
+	if _, unsupported := err.(*UnsupportedFeatureError); !unsupported ||
+		!strings.Contains(err.Error(), "container.made_to_measure+void_fill_reserve_ratio") {
+		t.Fatalf("got %v", err)
+	}
+}

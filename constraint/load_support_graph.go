@@ -209,19 +209,28 @@ func (g *LoadSupportGraph) Children(index int) []int {
 // Len is the number of units in the graph.
 func (g *LoadSupportGraph) Len() int { return len(g.units) }
 
-// NonStackableFailure is the rule that a direct-support edge may never originate at a
-// non-stackable item, checked for the unit at candidateIndex. placements are the placed
-// units in graph index order. O(s + 1) for s supporters.
+// NonStackableFailure is the first direct-support edge at the candidate its lower item
+// refuses, or nil: supporters ascending, then children ascending. non_stackable is tested
+// before the stacking-group rule on every edge, so a scene invalid before keeps its
+// code; the group test rides the same walk, one set lookup per edge. placements are the
+// placed units in graph index order. O(s + c) for s supporters and c children.
 func (g *LoadSupportGraph) NonStackableFailure(placements []domain.Placement, item domain.ItemInstance,
 	candidateIndex int) *Violation {
+	upperGroup := item.Item().StackingGroup()
 	for _, edge := range g.Supporters(candidateIndex) {
-		supporter := placements[edge.Index].Instance().Item()
-		if !supporter.Stackable() {
-			return &Violation{"non_stackable", supporter.ID()}
+		lower := placements[edge.Index].Instance().Item()
+		if code := lower.StackingRefusal(upperGroup); code != "" {
+			return &Violation{code, lower.ID()}
 		}
 	}
-	if !item.Item().Stackable() && len(g.Children(candidateIndex)) > 0 {
-		return &Violation{"non_stackable", item.Item().ID()}
+	lower := item.Item()
+	if lower.Stackable() && lower.AcceptsStackingGroups().Len() == 0 {
+		return nil
+	}
+	for _, child := range g.Children(candidateIndex) {
+		if code := lower.StackingRefusal(placements[child].Instance().Item().StackingGroup()); code != "" {
+			return &Violation{code, lower.ID()}
+		}
 	}
 	return nil
 }

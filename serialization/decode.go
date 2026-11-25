@@ -33,7 +33,7 @@ type DecodedRequest struct {
 
 // Decode reads a wire request in the reference's order, so a malformed request earns the
 // same first refusal it does there. A request no engine may answer is refused with a
-// *domain.InvalidRequestError naming the bad value (docs/ERRORS.md); a refusal the rule table
+// *domain.InvalidRequestError naming the bad value; a refusal the rule table
 // does not name still reaches the caller as one, with reason "invalid_value".
 func Decode(raw interface{}) (*DecodedRequest, error) {
 	request, ok := raw.(map[string]interface{})
@@ -420,6 +420,10 @@ func decodeItem(raw object, unit string) (*domain.Item, error) {
 	if spec.MaxCompressionPressureKPA, err = raw.optionalInteger("max_compression_pressure_kpa"); err != nil {
 		return nil, err
 	}
+	spec.StackingGroup = optionalText(raw, "stacking_group")
+	if spec.AcceptsStackingGroups, err = raw.tagSet("accepts_stacking_groups"); err != nil {
+		return nil, err
+	}
 	return domain.NewItem(spec)
 }
 
@@ -685,7 +689,62 @@ func decodeContainer(raw object, unit string) (*domain.Container, error) {
 	if spec.AccessDirections, err = raw.strings("access_directions"); err != nil {
 		return nil, err
 	}
+	if boundary, ok := raw.get("deformable_boundary"); ok {
+		spec.DeformableBoundary = toText(boundary.(map[string]interface{})["kind"])
+	}
+	if spec.MadeToMeasure, err = decodeMadeToMeasure(raw, unit); err != nil {
+		return nil, err
+	}
 	return domain.NewContainer(spec)
+}
+
+// decodeMadeToMeasure reads a machine that already passed its request rules.
+func decodeMadeToMeasure(raw object, unit string) (*domain.MadeToMeasure, error) {
+	value, ok := raw.get("made_to_measure")
+	if !ok {
+		return nil, nil
+	}
+	machine := object(value.(map[string]interface{}))
+	sideTicks := func(name string) ([3]int64, error) {
+		var ticks [3]int64
+		box, present := machine.get(name)
+		if !present {
+			return ticks, nil
+		}
+		for axis, side := range []string{"length", "width", "height"} {
+			length, err := parseLength(box.(map[string]interface{})[side], unit)
+			if err != nil {
+				return ticks, err
+			}
+			ticks[axis] = length.Ticks()
+		}
+		return ticks, nil
+	}
+	minimum, err := sideTicks("minimum")
+	if err != nil {
+		return nil, err
+	}
+	increment, err := sideTicks("increment")
+	if err != nil {
+		return nil, err
+	}
+	allowance, err := sideTicks("outer_allowance")
+	if err != nil {
+		return nil, err
+	}
+	price, err := machine.integer("cost_per_square_metre_minor", 0)
+	if err != nil {
+		return nil, err
+	}
+	tare := int64(0)
+	if given, present := machine.get("tare_per_square_metre"); present {
+		weight, err := parseWeight(given, weightUnit)
+		if err != nil {
+			return nil, err
+		}
+		tare = weight.Ticks()
+	}
+	return domain.NewMadeToMeasure(minimum, increment, price, tare, allowance)
 }
 
 func tagLimits(raw object) (map[string]int64, error) {

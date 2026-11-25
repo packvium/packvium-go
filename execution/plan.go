@@ -124,7 +124,7 @@ func missingField(detail string) error {
 //
 // loadingOrders maps a container's index to the engine-computed order its placements should
 // be loaded in. It is optional and injected because the order is a statement about physics
-// that this adapter must not make for itself; see steps. request is accepted for the
+// that the plan builder must not make for itself; see steps. request is accepted for the
 // contract's signature and read for nothing today. O(p log p + a·s) for p placements and a
 // alternatives with s score entries each.
 func BuildPlan(request, result map[string]interface{}, loadingOrders map[int][]int) (map[string]interface{}, error) {
@@ -197,7 +197,7 @@ func buildContainers(containers []interface{}, loadingOrders map[int][]int) ([]i
 // steps is the operator sequence for one container, or an honest absence of one.
 //
 // The engines compute a loading order under support and accessibility rules, from domain
-// objects this adapter never sees, so it is injected: a caller who has the order passes it,
+// objects the plan builder never sees, so it is injected: a caller who has the order passes it,
 // and one who does not gets no order at all. Falling back to the order placements happen to
 // appear in would present an artifact of how the solver walked its candidates as if it were
 // a safe order to lift boxes in.

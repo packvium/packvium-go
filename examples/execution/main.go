@@ -9,15 +9,15 @@
 // a screen should say.
 //
 // The execution plan is that second document. It is derived from an already validated
-// result -- it calls no solver and no validator, and a test in each language asserts so.
+// result -- it calls no solver and no validator.
 // Anything it could decide on its own would be a decision made twice.
 //
 // It also has no way, on its own, for the operator standing there to say the printer must go
 // in the corner. Sections 5 and 6 add that: an operator lock, which re-solves through the
 // ordinary engine and comes back as a second plan beside the approved one.
 //
-// The scene is the one the reference examples build, and the plan is held to a
-// byte-identical canonical form across the engines.
+// Every Packvium engine builds this example's load and emits the plan in the same
+// byte-identical canonical form.
 package main
 
 import (
@@ -123,7 +123,7 @@ func order(request, result, container object) {
 	fmt.Println()
 	paragraph(
 		"  Every placement is listed and not one is numbered. The engines compute a safe",
-		"  loading order from geometry this adapter never sees, so without one it says",
+		"  loading order from geometry the plan builder never sees, so without one it says",
 		"  `unavailable` rather than guessing.",
 		"",
 		"  There is no third behaviour on purpose. Falling back to the order placements",
@@ -147,7 +147,7 @@ func order(request, result, container object) {
 	paragraph(
 		"  Hand it an order and each step is numbered. The order above is reversed on",
 		"  purpose, to show that the sequence is the one you supplied and not one the",
-		"  adapter re-derived behind your back.",
+		"  plan builder re-derived behind your back.",
 		"")
 }
 
@@ -183,15 +183,15 @@ func canonicalForm(plan object) string {
 	fmt.Printf("    %s...\n", canonical[:68])
 	fmt.Println()
 	paragraph(
-		"  Hand the same *result* to any Packvium adapter, this one included, and it emits",
+		"  Hand the same *result* to the plan builder of any Packvium engine and it emits",
 		"  the same bytes. That is stricter than the packing contract, and it can be: a",
 		"  plan is derived from a result, so there is nothing left to differ about.",
 		"",
-		"  It does not follow that every engine packing the same *request* agrees. This",
-		"  engine, like Python and PHP, is held to identical placements and produces this",
-		"  exact form; the Rust and JavaScript engines are held to a valid answer at or",
-		"  above the objective floor, so their plan for this request can be a different",
-		"  length. Whose packing is better is a question the plan never answers.",
+		"  It does not follow that every engine packing the same *request* agrees. Python,",
+		"  PHP, Java, .NET and Go return identical results at the same version; Rust and",
+		"  JavaScript return a valid answer at or above the objective floor, so their plan",
+		"  for this request can be a different length. Whose packing is better is a",
+		"  question the plan never answers.",
 		"")
 	return canonical
 }
@@ -261,7 +261,7 @@ func failures(request object, lock locks.PlacementLock) {
 		"  no answer, and reporting them the same way would hide which one happened.")
 }
 
-// position prints a lock's ticks the way the reference prints its tuple.
+// position prints a lock's ticks in Python's tuple notation, the shared notation.
 func position(lock locks.PlacementLock) string {
 	ticks := lock.PositionTicks()
 	return fmt.Sprintf("(%d, %d, %d)", ticks[0], ticks[1], ticks[2])

@@ -137,7 +137,7 @@ func compare(rule string, without, withRule []*domain.Item, containers []*domain
 	}
 }
 
-// millimetres renders an exact tick position for a human, as the reference's "%g" does.
+// millimetres renders an exact tick position for a human, in "%g" notation.
 func millimetres(ticks int64) string {
 	return strconv.FormatFloat(float64(ticks)/float64(units.TicksPerMM), 'g', 6, 64)
 }

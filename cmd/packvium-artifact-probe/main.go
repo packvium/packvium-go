@@ -1,5 +1,6 @@
-// Command packvium-artifact-probe is the batch probe the suite's artifact conformance
-// (conformance/artifacts/run.py) drives, answering the protocol of its probe.php.
+// A test harness for cross-engine conformance; not a supported interface.
+//
+// Command packvium-artifact-probe builds and exports operational artifacts in batch.
 //
 // stdin is a JSON list of cases; stdout is one JSON line per case, in order:
 // {"error": code-or-null, "json": ..., "csv": ..., "html": ...}. A "build" case names a

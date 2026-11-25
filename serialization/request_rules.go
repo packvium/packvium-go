@@ -236,7 +236,8 @@ var effortLimits = []string{"max_candidates_evaluated", "max_placement_attempts"
 
 var solverProfiles = []string{"fast", "balanced", "quality", "exact_small"}
 
-var objectives = []string{"default", "lowest_cost", "shipping_cost", "lowest_landed_cost", "open_dimension_height", "maximum_value"}
+var objectives = []string{"default", "lowest_cost", "shipping_cost", "lowest_landed_cost", "open_dimension_height", "maximum_value",
+	"maximum_volume"}
 
 var accessDirections = []string{"+x", "-x", "+y", "-y", "+z", "-z"}
 
@@ -353,8 +354,33 @@ func checkItem(raw interface{}, where, unit string) error {
 		{"nesting_height", measure(lengthMeasure, unit)}, {"max_stacked_items", atLeast(1)},
 		{"stop_index", atLeast(0)}, {"value", atLeast(0)},
 		{"max_compression_pressure_kpa", atLeast(0)}, {"minimum_support_ratio", ratio(&one)},
-		{"compression_ratio", ratio(nil)},
+		{"compression_ratio", ratio(nil)}, {"stacking_group", stackingGroupName},
+		{"accepts_stacking_groups", stackingGroupNames},
 	})
+}
+
+func stackingGroupName(value interface{}, field string) error {
+	text, ok := value.(string)
+	if !ok {
+		return refusal("wrong_type", field, "must be a string")
+	}
+	if text == "" {
+		return refusal("invalid_value", field, "must not be empty")
+	}
+	return nil
+}
+
+func stackingGroupNames(raw interface{}, where string) error {
+	names, err := listAt(raw, where)
+	if err != nil {
+		return err
+	}
+	for index, name := range names {
+		if err := stackingGroupName(name, where+domain.Pointer(strconv.Itoa(index))); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func checkContainer(raw interface{}, where, unit string) error {
@@ -383,7 +409,131 @@ func checkContainer(raw interface{}, where, unit string) error {
 		{"access_directions", checkAccessDirections},
 		{"tag_limits", checkTagLimits}, {"rate_table", checkRateTable},
 		{"obstacles", func(value interface{}, field string) error { return checkObstacles(value, field, unit) }},
+		{"deformable_boundary", func(value interface{}, field string) error {
+			return checkDeformableBoundary(container, value, field, where)
+		}},
+		{"made_to_measure", func(value interface{}, field string) error {
+			return checkMadeToMeasure(container, value, field, where, unit)
+		}},
 	})
+}
+
+// bagExclusions are the container fields a flat bag refuses, in reporting order.
+var bagExclusions = []string{"obstacles", "axles", "access_directions", "max_stack_density",
+	"outer_dimensions", "void_fill_reserve_ratio", "made_to_measure"}
+
+func checkDeformableBoundary(container map[string]interface{}, raw interface{}, field, where string) error {
+	boundary, err := objectAt(raw, field)
+	if err != nil {
+		return err
+	}
+	kind, err := required(boundary, "kind", field)
+	if err != nil {
+		return err
+	}
+	if err := oneOf(domain.DeformableBoundaryKinds)(kind, field+domain.Pointer("kind")); err != nil {
+		return err
+	}
+	if err := knownFields(boundary, field, []string{"kind"}); err != nil {
+		return err
+	}
+	for _, name := range bagExclusions {
+		if setBesideABag(name, container[name]) {
+			return refusal("not_allowed", where+domain.Pointer(name), "cannot be combined with deformable_boundary")
+		}
+	}
+	return nil
+}
+
+// setBesideABag reports whether a field is set in a way a bag refuses: an empty obstacle list
+// and a zero reserve change nothing, so only they are let through. The field already passed
+// its own rule.
+func setBesideABag(name string, value interface{}) bool {
+	switch name {
+	case "obstacles":
+		list, _ := value.([]interface{})
+		return len(list) > 0
+	case "void_fill_reserve_ratio":
+		return positiveNumber(value)
+	}
+	return value != nil
+}
+
+func positiveNumber(value interface{}) bool {
+	switch typed := value.(type) {
+	case int64:
+		return typed > 0
+	case *big.Int:
+		return typed.Sign() > 0
+	case float64:
+		return typed > 0
+	}
+	return false
+}
+
+// madeToMeasureFields is every key the request schema's made_to_measure declares; it sets
+// additionalProperties: false.
+var madeToMeasureFields = []string{"cost_per_square_metre_minor", "increment", "minimum", "outer_allowance",
+	"tare_per_square_metre"}
+
+// checkMadeToMeasure is the made-to-measure rules: shape top to bottom, then each
+// axis, then the price. Run after every other container field, so an existing error always
+// wins. O(1).
+func checkMadeToMeasure(container map[string]interface{}, raw interface{}, field, where, unit string) error {
+	machine, err := objectAt(raw, field)
+	if err != nil {
+		return err
+	}
+	if err := knownFields(machine, field, madeToMeasureFields); err != nil {
+		return err
+	}
+	for _, name := range []string{"minimum", "increment"} {
+		if _, err := required(machine, name, field); err != nil {
+			return err
+		}
+	}
+	box := func(value interface{}, at string) error { return dimensions(value, at, unit) }
+	if err := checkFields(machine, field, []fieldRule{{"minimum", box}, {"increment", box}, {"outer_allowance", box},
+		{"cost_per_square_metre_minor", atLeast(0)}, {"tare_per_square_metre", measure(weightMeasure, weightUnit)},
+	}); err != nil {
+		return err
+	}
+	if container["outer_dimensions"] != nil {
+		return refusal("not_allowed", where+"/outer_dimensions", "cannot be combined with made_to_measure")
+	}
+	inner, minimum, increment := sideTicks(container["inner_dimensions"], unit), sideTicks(machine["minimum"], unit),
+		sideTicks(machine["increment"], unit)
+	for axis, side := range sides {
+		switch {
+		case minimum[axis] == 0:
+			return refusal("invalid_value", field+domain.Pointer("minimum", side), "must be positive")
+		case increment[axis] == 0:
+			return refusal("invalid_value", field+domain.Pointer("increment", side), "must be positive")
+		case minimum[axis] > inner[axis]:
+			return refusal("invalid_value", field+domain.Pointer("minimum", side), "exceeds inner_dimensions")
+		case (inner[axis]-minimum[axis])%increment[axis] != 0:
+			return refusal("invalid_value", field+domain.Pointer("increment", side),
+				"does not divide inner_dimensions minus minimum")
+		}
+	}
+	price, _ := canonicaljson.Integer(machine["cost_per_square_metre_minor"])
+	fee, _ := canonicaljson.Integer(container["cost_minor"])
+	if domain.BoxCostMinorFor(price, fee, inner).Cmp(big.NewInt(canonicaljson.MaxExactMagnitude)) > 0 {
+		return refusal("invalid_value", field+"/cost_per_square_metre_minor",
+			"prices the largest box above "+strconv.FormatInt(canonicaljson.MaxExactMagnitude, 10))
+	}
+	return nil
+}
+
+// sideTicks reads dimensions that already passed their rule.
+func sideTicks(raw interface{}, unit string) [3]int64 {
+	box := raw.(map[string]interface{})
+	var ticks [3]int64
+	for axis, side := range sides {
+		length, _ := parseLength(box[side], unit)
+		ticks[axis] = length.Ticks()
+	}
+	return ticks
 }
 
 func dimensions(raw interface{}, where, unit string) error {

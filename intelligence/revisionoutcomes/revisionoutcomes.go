@@ -1,5 +1,5 @@
-// Package revisionoutcomes is packvium.revision_outcomes: approved plan revisions as labelled
-// evidence for historical evaluation.
+// Package revisionoutcomes turns approved plan revisions into labelled evidence for historical
+// evaluation.
 //
 // A revision records what differed from an approved plan. This package appends those records
 // to an outcomes.OutcomeLedger, where package holdout already evaluates recommendations on

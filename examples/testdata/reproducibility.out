@@ -2,9 +2,9 @@
 ==============================================================================
 1. A clock-limited search answers differently on different machines
 ==============================================================================
-  fast host    medium left out  8  termination time_limit   replay not_guaranteed
-  busy host    small  left out 14  termination time_limit   replay not_guaranteed
-  slower host  small  left out 19  termination time_limit   replay not_guaranteed
+  fast host    large  left out  0  termination complete     replay exact
+  busy host    medium left out  6  termination time_limit   replay not_guaranteed
+  slower host  small  left out 12  termination time_limit   replay not_guaranteed
   overloaded   small  left out 21  termination time_limit   replay not_guaranteed
 
   Same request, four answers. Each is a valid packing of what the search reached
@@ -26,8 +26,8 @@
 ==============================================================================
 3. A budget that is too small is still reproducible, and says so
 ==============================================================================
-  fast host    large  left out  3  termination effort_limit replay exact
-  overloaded   large  left out  3  termination effort_limit replay exact
+  fast host    large  left out  0  termination complete     replay exact
+  overloaded   large  left out  0  termination complete     replay exact
 
   The search stopped early and left items out -- `termination` is `effort_limit`,
   not `complete` -- but it stopped at the same point on both hosts, so the answer

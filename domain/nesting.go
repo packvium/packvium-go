@@ -65,6 +65,23 @@ func nestingOverlapVolume(placements []Placement) *big.Int {
 	return overlap
 }
 
+// ItemOccupiedVolume is the volume OccupiedVolume counts for this item before it is placed,
+// in any orientation: a hull its authored solid (a proper rotation keeps it, so one
+// orientation answers for all six through the memoised shape, O(1) after the first call),
+// anything else its declared box. A compressible item keeps its box: collision and support
+// use the uncompressed box, so declared volumes stay additive.
+func ItemOccupiedVolume(instance ItemInstance) *big.Int {
+	item := instance.item
+	if item.spec.ShapeType != ConvexHull {
+		return item.spec.Dimensions.Volume()
+	}
+	shape, err := item.HullShape(LWH)
+	if err != nil {
+		panic(err)
+	}
+	return shape.Volume().Big()
+}
+
 // OccupiedVolume is the space one placement actually takes: its hull for a convex_hull item,
 // its compressed height for a compressible one, otherwise its box.
 func OccupiedVolume(placement Placement) *big.Int {

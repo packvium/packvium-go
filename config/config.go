@@ -75,7 +75,7 @@ type Options struct {
 	ContainerPlanNodeLimit      int64
 }
 
-// Default is the reference engine's default options for a profile.
+// Default is the reference engine's (the Python package's) default options for a profile.
 func Default(profile SolverProfile) Options {
 	options := Options{
 		Profile: profile, TimeLimitMS: 1000, TopK: 3, Seed: 42, ExactItemLimit: 7, MultiStartOrders: 8,

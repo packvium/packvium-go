@@ -1,5 +1,5 @@
 // Package artifacts builds the portable operational artifact and exports it as JSON, CSV and a
-// printable HTML work order (docs/OPERATIONAL-ARTIFACTS.md in the suite repository).
+// printable HTML work order.
 //
 // An execution plan tells an operator what to do first; it does not say how big the boxes
 // are, what the load weighs or which request and solver produced it. The artifact is the one
@@ -32,7 +32,7 @@ const Format = "packvium-operational-artifact/v1"
 // SuiteVersion is the suite version of this builder, the same string in every engine of one
 // release. The engine's own name is deliberately not recorded: correct builders naming
 // themselves would emit different documents.
-const SuiteVersion = "1.5.0"
+const SuiteVersion = "1.6.0"
 
 // SolverFields are the deterministic part of result.algorithm. duration_ms is wall-clock time
 // and never enters an artifact.

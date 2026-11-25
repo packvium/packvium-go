@@ -3,14 +3,14 @@
 Deterministic 3D cartonization and container packing in Go, with exact integer geometry and
 no dependencies beyond the standard library.
 
-Packvium for Go is a full reimplementation of the Packvium reference engine, not a binding
-over another one. It accepts the same requests and returns the same results as the Python,
-PHP, Java and .NET engines. Its tests run the shared conformance corpus, and every result
-matches the reference result byte for byte.
+Packvium for Go is a full reimplementation of Packvium, not a binding over another engine.
+It accepts the same requests as every Packvium engine. Python, PHP, Java, .NET and Go return identical results at the same version; Rust and JavaScript return a valid answer at or above the objective floor.
+The reference engine is the Python package, `packvium`; every release of this module is
+checked against its results byte for byte.
 
-> **Version 1.5.0.** This release corresponds to Packvium 1.5.0 in the other languages, and
-> its tests run the 1.5.0 conformance corpus: every packing fixture, every commerce case, the
-> execution plan of every golden result and its operational artifact, every structured request
+> **Version 1.6.0.** This release corresponds to Packvium 1.6.0 in the other languages, and
+> it was checked against the 1.6.0 conformance corpus: every packing request, every commerce case, the
+> execution plan and operational artifact of every expected result, every structured request
 > error and every plan-revision case. Field names, status codes and the objective vector stay
 > the same for all of 1.x.
 
@@ -21,6 +21,7 @@ matches the reference result byte for byte.
 - [Packing with domain objects](#packing-with-domain-objects)
 - [The JSON request API](#the-json-request-api)
 - [Constraints and objectives](#constraints-and-objectives)
+- [Boxes cut to measure, flat bags and stacking groups](#boxes-cut-to-measure-flat-bags-and-stacking-groups)
 - [Commerce](#commerce)
 - [Execution plans](#execution-plans)
 - [Operator locks](#operator-locks)
@@ -31,14 +32,14 @@ matches the reference result byte for byte.
 - [Examples](#examples)
 - [Command line](#command-line)
 - [Determinism](#determinism)
-- [Differences from the reference engine](#differences-from-the-reference-engine)
+- [Differences from the Python engine](#differences-from-the-python-engine)
 - [Versions and milestones](#versions-and-milestones)
 - [Testing](#testing)
 
 ## Install
 
 ```bash
-go get github.com/packvium/packvium-go@v1.5.0
+go get github.com/packvium/packvium-go@v1.6.0
 ```
 
 Go 1.13 or newer. The module is checked on a real Go 1.13 toolchain, so projects that
@@ -212,8 +213,11 @@ shows one, and why a rule every caller must obey belongs in the request instead.
 `policy` block compiles into the same constraint pipeline, so an illegal placement is
 refused during the search rather than filtered out afterwards.
 
-An objective decides what "best" means. There are six: `default`, `lowest_cost`,
-`shipping_cost`, `lowest_landed_cost`, `open_dimension_height` and `maximum_value`.
+An objective decides what "best" means. There are seven: `default`, `lowest_cost`,
+`shipping_cost`, `lowest_landed_cost`, `open_dimension_height`, `maximum_value` and
+`maximum_volume`. `maximum_volume` ranks the share of the requested volume left behind ahead
+of the number of pieces, the way container-loading benchmarks are scored: where `default`
+keeps many small items, it keeps the one large item that fills more space.
 
 ```go
 options := config.Default(config.Balanced)
@@ -221,8 +225,10 @@ options.Objective = "lowest_cost"
 cfg, err := config.New(options)
 ```
 
-The score is a lexicographic vector of exact integers whose first key is always the number
-of items left out, so no objective will leave an item behind to save money. Every item that
+The score is a lexicographic vector of exact integers. Its first key is the number of items
+left out, so no objective will leave an item behind to save money; under `maximum_volume` it
+is the share of the requested volume left behind, and a complete answer still beats every
+incomplete one. Every item that
 is left out carries a reason code and a proof level:
 
 ```go
@@ -232,7 +238,76 @@ for _, left := range result.Unpacked {
 ```
 
 [`examples/constraints`](examples/constraints) and [`examples/objectives`](examples/objectives)
-build scenes where each rule and each objective changes the answer.
+build loads where each rule changes the answer, and so does each of six of the seven
+objectives (all but `maximum_volume`).
+
+With the default `MinimumSupportRatio` of 0 an item may stand above the floor with nothing
+under it. Such a result ends its `Warnings` with one line, the same in every engine, so a
+caller who never set the ratio is told:
+
+```go
+for _, warning := range result.Warnings {
+	fmt.Println(warning)
+	// unsupported_placements: 1 placement(s) rest on nothing above the container floor;
+	// set configuration.minimum_support_ratio above 0 to require support
+}
+```
+
+An item left out because no container of a fitting type is left reports
+`container_inventory_exhausted`; one that overloads an axle wherever it stands alone reports
+`axle_overloaded`. Both are `inferred`.
+
+## Boxes cut to measure, flat bags and stacking groups
+
+A **made-to-measure** container is an on-demand box machine. Its `InnerDimensions` is the
+largest box it cuts; `domain.NewMadeToMeasure` adds the smallest box and the cut step per
+axis, the board price per square metre and the board weight per square metre, and the outer
+allowance dimensional weight is billed on. Each trial packs into up to four boxes sized from
+the items, smallest first, and keeps the first that takes everything, so the box is compact
+instead of a row or a plate:
+
+```go
+mm := units.TicksPerMM
+machine, err := domain.NewMadeToMeasure(
+	[3]int64{60 * mm, 60 * mm, 60 * mm}, // the smallest box
+	[3]int64{25 * mm, 25 * mm, 25 * mm}, // the cut step
+	1000,                                // board, minor units per square metre
+	0,                                   // board weight, weight ticks per square metre
+	[3]int64{3 * mm, 3 * mm, 3 * mm})    // board thickness on each side
+cutter, err := domain.NewContainer(domain.ContainerSpec{ID: "machine", CostMinor: 40,
+	InnerDimensions: domain.MustDimensions(1510*mm, 1510*mm, 1510*mm), MadeToMeasure: machine})
+```
+
+The packed container is the box that ships: its `InnerDimensions`, `OuterDimensions`,
+`CostMinor` and `TareWeight` are the fabricated box's, every objective prices it, and
+`AchievedDimensions()` is the extent of its contents before it was rounded onto the machine
+grid. A JSON request that gives such a container axles, obstacles or a void-fill reserve, or
+fixes a placement in it, is refused as an unsupported feature.
+
+A **flat bag** reads `InnerDimensions` as a poly mailer's flat length, flat width and largest
+filled thickness, and admits a packing only when length plus thickness and width plus
+thickness of the load fit the bag. Its dimensional weight is billed on the load's
+`AchievedDimensions()`, and bags and boxes mix in one plan:
+
+```go
+mailer, err := domain.NewContainer(domain.ContainerSpec{ID: "mailer", DeformableBoundary: domain.FlatBag,
+	InnerDimensions: domain.MustDimensions(240*mm, 140*mm, 100*mm)})
+```
+
+**Stacking groups** say which item may rest directly on which: "pallets may carry pallets
+and cartons, never drums". An item with no group may not rest on a constrained one, every
+supporter of a bridging item must accept it, and `Stackable = false` still wins:
+
+```go
+pallet := domain.NewItemSpec("pallet", palletSize)
+group := "pallet"
+pallet.StackingGroup, pallet.AcceptsStackingGroups = &group, []string{"pallet", "carton"}
+```
+
+In a JSON request these are `container.made_to_measure`, `container.deformable_boundary:
+{"kind": "flat_bag"}`, `item.stacking_group` and `item.accepts_stacking_groups`, and the
+result's containers carry `achieved_dimensions` and `made_to_measure.{cost_minor,
+tare_weight}`.
 
 ## Commerce
 
@@ -452,14 +527,14 @@ four historical shipments.
 
 ## Examples
 
-[`examples/`](examples) has one runnable program per directory. Each prints exactly what
-its Python counterpart prints, apart from a few lines that name Go values (`nil`, `true`)
-where Python names its own; `go test ./examples/` checks that, line by line.
+[`examples/`](examples) has one runnable program per directory. `go test ./examples/` is the
+test suite's run of every example: it checks each one's output against a recorded copy; the
+output uses the notation shared by every Packvium language.
 
 | Example | What it shows | Run it |
 | --- | --- | --- |
 | [`basic`](examples/basic) | The smallest useful call: items go in and placements come out. | `go run ./examples/basic` |
-| [`objectives`](examples/objectives) | All six objectives, on scenes where they choose differently. | `go run ./examples/objectives` |
+| [`objectives`](examples/objectives) | Six of the seven objectives (all but `maximum_volume`), each on a load where it chooses differently. | `go run ./examples/objectives` |
 | [`constraints`](examples/constraints) | Upright-only, floor-only, top-load limits and tags, and how to read why an item was refused. | `go run ./examples/constraints` |
 | [`units`](examples/units) | Why there are no floats: fractional inches, exact ticks, and a refusal caused by a single tick. | `go run ./examples/units` |
 | [`serialization`](examples/serialization) | The JSON contract, and which mistakes are refused and which are ignored. | `go run ./examples/serialization` |
@@ -513,24 +588,23 @@ The same input always gives the same result.
   recommendations and holdout replays are functions of what you pass in; every "as of" is an
   instant you supply.
 
-## Differences from the reference engine
+## Differences from the Python engine
 
-Valid requests get identical results. The Go port differs in a few places, none of which
-shows up in the conformance corpus:
+Valid requests get identical results. This module differs from the Python package in a few
+places, none of which shows up in the conformance corpus:
 
 - Lengths and weights are 64-bit ticks, as in PHP and Java. A value that would overflow is
   refused, where Python would keep calculating with larger integers.
-- The parallel portfolio cannot be enabled from a request, so it is not included; every
-  start runs one after another, as the reference runs them.
-- JSON `NaN`/`Infinity` literals, which the reference's parser accepts, are refused.
-- Errors are returned values where the reference raises exceptions, and a Go type makes
+- There is no parallel portfolio: starts always run one after another, and a request cannot ask for parallelism in any engine.
+- JSON `NaN`/`Infinity` literals, which Python's parser accepts, are refused.
+- Errors are returned values where Python raises exceptions, and a Go type makes
   some malformed values impossible to pass at all, such as a lock position without three
   integer axes or a boolean metric.
 
 ## Versions and milestones
 
-The module's versions follow the Packvium releases: 1.5.0 here answers every request the way
-Packvium 1.5.0 does in the other languages. Within 1.x, field names, status codes and the
+The module's versions follow the Packvium releases: 1.6.0 here answers every request the way
+Packvium 1.6.0 does in the other languages. Within 1.x, field names, status codes and the
 objective vector do not change. What each release added is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Testing
@@ -540,8 +614,8 @@ go vet ./...
 go test ./...   # unit tests, and every example against its recorded output
 ```
 
-The full conformance corpus runs in the Packvium suite repository, where all the engines are
-checked against the same fixtures. API documentation is on
+Before each release the module is also run against the full conformance corpus, the shared
+requests and expected results every Packvium engine is checked against. API documentation is on
 [pkg.go.dev](https://pkg.go.dev/github.com/packvium/packvium-go). To contribute or report a
 problem, see [CONTRIBUTING.md](CONTRIBUTING.md); for security reports, [SECURITY.md](SECURITY.md).
 

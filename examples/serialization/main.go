@@ -4,9 +4,9 @@
 //
 //	go run ./examples/serialization
 //
-// serialization.Pack takes a decoded JSON request and returns the result in the shape all
-// the engines return. The same document can be posted to any of them, or piped to the
-// command line, and the answer agrees byte for byte with every other engine's.
+// serialization.Pack takes a decoded JSON request and returns the result in the shape every
+// Packvium engine returns. The same document can be posted to any of them, or piped to the
+// command line. Python, PHP, Java, .NET and Go return identical results at the same version; Rust and JavaScript return a valid answer at or above the objective floor.
 //
 // The parser is strict about values and about the configuration's keys: a malformed number,
 // an unknown objective or a misspelt configuration key is refused, while an unknown key on
@@ -145,7 +145,7 @@ func main() {
 	fmt.Println("the CLI takes exactly the document above:  echo '...' | go run ./cmd/packvium")
 }
 
-// refusedByScope keeps only the scopes that refuse something, as the reference prints them.
+// refusedByScope keeps only the scopes that refuse something, in the shared notation.
 func refusedByScope(unsupported serialization.UnsupportedFields) map[string][]string {
 	scopes := map[string][]string{"request": unsupported.Request, "configuration": unsupported.Configuration,
 		"item": unsupported.Item, "container": unsupported.Container, "shape_type": unsupported.ShapeTypes}
@@ -196,7 +196,8 @@ func indentInWireOrder(value interface{}, indent string) string {
 	return fmt.Sprint(value)
 }
 
-// repr prints a decoded JSON value the way the reference prints its own values.
+// repr prints a decoded JSON value in Python's notation, which every Packvium language's
+// output shares.
 func repr(value interface{}) string {
 	switch typed := value.(type) {
 	case string:

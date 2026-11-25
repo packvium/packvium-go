@@ -84,6 +84,41 @@ func (MaximumValueSolutionScorer) Score(solution RawSolution) ObjectiveScore {
 	return ObjectiveScore{base[0], forgone, base[1], base[2], base[3]}
 }
 
+// MaximumVolumeSolutionScorer ranks the share of the requested item volume left unpacked
+// ahead of how many items that is: fill the space rather than place the most pieces. The
+// share is ceil(unpacked volume * 10^6 / requested volume) in nominal item volume, rounded up
+// so an incomplete answer never scores zero and a complete one still beats every incomplete
+// one. O(n) for n item instances.
+type MaximumVolumeSolutionScorer struct{}
+
+// Score leads with the unpacked volume share.
+func (MaximumVolumeSolutionScorer) Score(solution RawSolution) ObjectiveScore {
+	base := DefaultSolutionScorer{}.Score(solution)
+	unpacked := new(big.Int)
+	for _, item := range solution.Unpacked {
+		unpacked.Add(unpacked, item.Instance.Item().Dimensions().Volume())
+	}
+	requested := new(big.Int).Set(unpacked)
+	for _, packed := range solution.Containers {
+		for _, instance := range packed.Instances() {
+			requested.Add(requested, instance.Item().Dimensions().Volume())
+		}
+	}
+	share := int64(0)
+	if requested.Sign() > 0 {
+		scaled := new(big.Int).Mul(unpacked, scorePPM)
+		scaled.Add(scaled, requested).Sub(scaled, big.NewInt(1)).Quo(scaled, requested)
+		share = exactInt64(scaled)
+	}
+	return ObjectiveScore{share, base[0], base[1], base[2], base[3]}
+}
+
+// ranksByVolume reports whether the objective fills volume before it counts pieces.
+func ranksByVolume(cfg *config.PackingConfig) bool { return cfg.Objective() == MaximumVolumeObjective }
+
+// MaximumVolumeObjective ranks by the volume left behind ahead of the piece count.
+const MaximumVolumeObjective = "maximum_volume"
+
 // OpenDimensionSolutionScorer ranks the summed raw stack height ahead of container count,
 // cost and unused volume: for a container whose height is a generous ceiling, the question is
 // how tall the load ends up. O(c).
@@ -124,24 +159,48 @@ func requireDivisor(cfg *config.PackingConfig, objective string) int64 {
 }
 
 func (s ShippingCostSolutionScorer) billed(packed *domain.PackedContainer) int64 {
-	return BilledTicks(packed.Container(), packed.PayloadWeight().Ticks(), s.Divisor, s.LengthUnit, s.WeightUnit)
+	dimensional := dimensionalTicks(packed.BilledDimensions(), s.Divisor, s.LengthUnit, s.WeightUnit)
+	return ints.Max(packed.GrossWeight().Ticks(), dimensional)
 }
 
-// BilledTicks is max(gross weight, dimensional weight of the shipped box): the one definition
-// the search, the score and the final guard all use, so they cannot bill a container
-// differently.
-func BilledTicks(container *domain.Container, payloadTicks, divisor int64, lengthUnit, weightUnit string) int64 {
-	dimensional, err := container.EffectiveOuterDimensions().DimensionalWeight(divisor, lengthUnit, weightUnit)
+func dimensionalTicks(dimensions domain.Dimensions, divisor int64, lengthUnit, weightUnit string) int64 {
+	dimensional, err := dimensions.DimensionalWeight(divisor, lengthUnit, weightUnit)
 	if err != nil {
 		refuse(err)
 	}
-	return ints.Max(ints.AddExact(container.TareWeight().Ticks(), payloadTicks), dimensional.Ticks())
+	return dimensional.Ticks()
+}
+
+// BilledTicks is max(gross weight, dimensional weight of the declared box) for a rigid
+// container: its outer size when declared, else its inner size.
+func BilledTicks(container *domain.Container, payloadTicks, divisor int64, lengthUnit, weightUnit string) int64 {
+	return ints.Max(ints.AddExact(container.TareWeight().Ticks(), payloadTicks),
+		dimensionalTicks(container.EffectiveOuterDimensions(), divisor, lengthUnit, weightUnit))
 }
 
 // BilledTicksForConfig is BilledTicks with the configuration's divisor and units.
 func BilledTicksForConfig(container *domain.Container, payloadTicks int64, cfg *config.PackingConfig) int64 {
 	return BilledTicks(container, payloadTicks, requireDivisor(cfg, cfg.Objective()),
 		cfg.DimensionalWeightLengthUnit(), cfg.DimensionalWeightWeightUnit())
+}
+
+// BilledStateTicks is max(gross weight, dimensional weight of the shipped parcel) for a search
+// state: the one definition the search, the score and the final guard all use, so they cannot
+// bill a container differently. A flat bag is billed on its running extents, the parcel a
+// carrier measures, and an empty bag bills nothing by volume; a rigid container on its
+// declared outer size, else its inner size. O(1).
+func BilledStateTicks(state *ContainerState, cfg *config.PackingConfig) int64 {
+	container := state.Container
+	gross := ints.AddExact(container.TareWeight().Ticks(), state.PayloadTicks)
+	dimensions := container.EffectiveOuterDimensions()
+	if container.IsFlatBag() {
+		if len(state.Placements) == 0 {
+			return ints.Max(gross, 0)
+		}
+		dimensions = domain.MustDimensions(state.MaxX, state.MaxY, state.MaxZ)
+	}
+	return ints.Max(gross, dimensionalTicks(dimensions, requireDivisor(cfg, cfg.Objective()),
+		cfg.DimensionalWeightLengthUnit(), cfg.DimensionalWeightWeightUnit()))
 }
 
 // Score puts the billable weight second.
@@ -239,7 +298,7 @@ func UnpriceableContainer(containers []*domain.PackedContainer, cfg *config.Pack
 
 // objectiveNames are the registered objectives in registration order.
 var objectiveNames = []string{"default", "lowest_cost", "shipping_cost", LandedCostObjective,
-	"open_dimension_height", "maximum_value"}
+	"open_dimension_height", "maximum_value", MaximumVolumeObjective}
 
 // ResolveObjective is the scorer a configuration's objective names; each factory reads its
 // own inputs from the configuration.
@@ -257,6 +316,8 @@ func ResolveObjective(name string, cfg *config.PackingConfig) SolutionScorer {
 		return OpenDimensionSolutionScorer{}
 	case "maximum_value":
 		return MaximumValueSolutionScorer{}
+	case MaximumVolumeObjective:
+		return MaximumVolumeSolutionScorer{}
 	}
 	refuse(&UnknownObjectiveError{"unknown objective " + pythonRepr(name) + "; expected one of " +
 		pythonList(sortedStrings(objectiveNames))})

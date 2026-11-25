@@ -10,8 +10,7 @@ import (
 	"github.com/packvium/packvium-go/internal/ints"
 )
 
-// Lower bounds on the objective vector. The mathematics is fixed by
-// docs/OPTIMALITY-CERTIFICATES.md and held byte-identical to the reference on the shared
+// Lower bounds on the objective vector, held byte-identical to the reference on the shared
 // corpus. Every volume, weight sum, capacity and selected cost is a *big.Int: a one-metre
 // cube is 4.1e21 cubic ticks. O(n log n + c log c) time and O(n + c) space for n instances and
 // c container types.

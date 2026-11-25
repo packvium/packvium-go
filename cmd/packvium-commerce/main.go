@@ -1,9 +1,8 @@
 // Command packvium-commerce drives the exported commerce API from stdin to stdout: one
 // case object ({"operation", "document", "request"}) in, one canonical result document
-// out. It calls only the public commerce functions, so what the conformance harness
-// compares is the exported API.
+// out. It calls only the public commerce functions.
 //
-// Exit codes follow the other ports' adapters: 1 with "input error: ..." for a malformed
+// Exit codes: 1 with "input error: ..." for a malformed
 // request, 2 for an unknown operation, and 255 for any other failure. A rejection is an
 // answer, so it exits 0.
 package main

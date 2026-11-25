@@ -103,3 +103,13 @@ func untilTimeLimit(search func()) (reached bool) {
 	search()
 	return false
 }
+
+// searchNodeCeiling is the stats.SearchNodesExpanded at which the attached budget stops a
+// search counting nodes on stats, or nil when counting there can never trip it: no budget,
+// no node bound, or a budget that reads another SearchStats.
+func (d *Deadline) searchNodeCeiling(stats *SearchStats) *int64 {
+	if d.effort == nil || d.effort.MaxSearchNodes == nil || d.stats != stats {
+		return nil
+	}
+	return d.effort.MaxSearchNodes
+}

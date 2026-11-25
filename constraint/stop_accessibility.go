@@ -58,8 +58,12 @@ func (s *StopAccessibilityConstraint) inert(container *domain.Container, routeSe
 	return !routeSensitive || len(s.directionsFor(container)) == 0
 }
 
-// directionsFor is the container's own doors, or the default when it states none.
+// directionsFor is the container's own doors, or the default when it states none. A flat bag
+// has no walls, so it inherits no doors either.
 func (s *StopAccessibilityConstraint) directionsFor(container *domain.Container) []string {
+	if container.IsFlatBag() {
+		return nil
+	}
 	if s.doorsOf != container {
 		s.doorsOf, s.doors = container, container.AccessDirections()
 	}

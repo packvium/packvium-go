@@ -1,6 +1,6 @@
 // Command packvium packs one request: packing JSON in (a file argument, or stdin), result JSON
-// out (stdout, or -o FILE). It shares the stdin/stdout contract of every other engine's
-// command line, so the conformance runner drives it the same way.
+// out (stdout, or -o FILE). It shares the stdin/stdout contract of every other Packvium
+// engine's command line.
 //
 // A refused request exits 1 with the refusal on stderr; a usage error exits 2.
 package main

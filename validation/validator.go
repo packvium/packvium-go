@@ -101,6 +101,7 @@ func validate(request *domain.PackingRequest, containers []*domain.PackedContain
 		issues = append(issues, ValidationIssue{"unknown_item", id})
 	}
 	issues = append(issues, splitGroups(containers)...)
+	issues = append(issues, madeToMeasureIssues(request, containers)...)
 	issues = append(issues, fixedPlacementIssues(request, containers)...)
 	if complete {
 		issues = append(issues, partialGroups(request, containers)...)
@@ -152,6 +153,9 @@ func containerIssues(packed *domain.PackedContainer, minimumSupportRatio float64
 		}
 	}
 	issues = append(issues, loadIssues(packed, placements)...)
+	if container.IsFlatBag() && !bagAdmits(container, placements) {
+		issues = append(issues, ValidationIssue{"bag_girth_exceeded", packed.ID()})
+	}
 	if onRoute(placements) {
 		if issue := unloadingOrderViolation(packed, placements); issue != nil {
 			issues = append(issues, *issue)
@@ -164,6 +168,55 @@ func containerIssues(packed *domain.PackedContainer, minimumSupportRatio float64
 		issues = append(issues, ValidationIssue{"max_items_exceeded", packed.ID()})
 	}
 	return issues
+}
+
+// bagAdmits is the girth rule over the envelopes alone; the frame is checked per
+// placement. O(p).
+func bagAdmits(container *domain.Container, placements []domain.Placement) bool {
+	extent := domain.Extent(placements)
+	return domain.GirthAdmits(container.InnerDimensions(), extent[0], extent[1], extent[2])
+}
+
+// madeToMeasureIssues holds every made-to-measure box to the one its placements call for
+//: containment was checked like any container's, and this re-cuts the box from the
+// declared machine and the achieved extent, so a trial committed with a stale or mixed-up box
+// is caught. O(p) per container.
+func madeToMeasureIssues(request *domain.PackingRequest, containers []*domain.PackedContainer) []ValidationIssue {
+	declared := map[string]*domain.Container{}
+	for _, container := range request.Containers() {
+		declared[container.ID()] = container
+	}
+	var issues []ValidationIssue
+	for _, packed := range containers {
+		machine := declared[packed.Container().ID()]
+		achieved := packed.AchievedDimensions()
+		if machine == nil || machine.MadeToMeasure() == nil || achieved == nil {
+			continue
+		}
+		expected := machine.Fabricate(domain.Triple(*achieved))
+		got := packed.Container()
+		for _, check := range []struct {
+			code  string
+			equal bool
+		}{
+			{"fabricated_dimensions_mismatch", got.InnerDimensions() == expected.InnerDimensions()},
+			{"outer_dimensions_mismatch", sameOuter(got.OuterDimensions(), expected.OuterDimensions())},
+			{"made_to_measure_cost_mismatch", got.CostMinor() == expected.CostMinor()},
+			{"made_to_measure_tare_mismatch", got.TareWeight() == expected.TareWeight()},
+		} {
+			if !check.equal {
+				issues = append(issues, ValidationIssue{check.code, packed.ID()})
+			}
+		}
+	}
+	return issues
+}
+
+func sameOuter(left, right *domain.Dimensions) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return *left == *right
 }
 
 // pairRules is the placement constraints worth running against every other placement, and

@@ -91,6 +91,18 @@ func (p *PackedContainer) CentreOfMassOffsetPPM() int64 {
 	return CentreOfMassOffsetPPM(inner, p.placements)
 }
 
+// Instances are the packed item instances: the lattice's, else each placement's. O(p).
+func (p *PackedContainer) Instances() []ItemInstance {
+	if p.lattice != nil {
+		return append([]ItemInstance(nil), p.latticeItems...)
+	}
+	instances := make([]ItemInstance, len(p.placements))
+	for index, placement := range p.placements {
+		instances[index] = placement.instance
+	}
+	return instances
+}
+
 // ExpandPlacements is every placement, reconstructed from the lattice when there is one.
 func (p *PackedContainer) ExpandPlacements() []Placement {
 	if p.lattice != nil {
@@ -99,12 +111,33 @@ func (p *PackedContainer) ExpandPlacements() []Placement {
 	return p.Placements()
 }
 
+// AchievedDimensions is the largest envelope x2, y2 and z2 of the placements from the origin:
+// a flat bag's conformed package, or a made-to-measure box's extent before it is
+// rounded onto the machine grid. Nil for any other container. O(p).
+func (p *PackedContainer) AchievedDimensions() *Dimensions {
+	if !p.container.IsFlatBag() && p.container.MadeToMeasure() == nil {
+		return nil
+	}
+	extent := Extent(p.placements)
+	achieved := MustDimensions(extent[0], extent[1], extent[2])
+	return &achieved
+}
+
+// BilledDimensions is what a carrier measures: a bag's achieved package, else the declared
+// outer size.
+func (p *PackedContainer) BilledDimensions() Dimensions {
+	if achieved := p.AchievedDimensions(); achieved != nil && p.container.IsFlatBag() {
+		return *achieved
+	}
+	return p.container.EffectiveOuterDimensions()
+}
+
 // AsItem turns the packed container into an item for the next nesting level.
 func (p *PackedContainer) AsItem(id string, keepUpright bool, maxTopLoad *units.Weight) (*Item, error) {
 	if id == "" {
 		id = p.ID()
 	}
-	spec := NewItemSpec(id, p.container.EffectiveOuterDimensions())
+	spec := NewItemSpec(id, p.BilledDimensions())
 	spec.Weight = p.GrossWeight()
 	spec.KeepUpright = keepUpright
 	spec.MaxTopLoad = maxTopLoad

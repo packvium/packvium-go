@@ -1,7 +1,7 @@
 // Package commerce is Packvium's exported commercial and control-plane API: three
 // deterministic functions -- Quote, EvaluatePolicy and CatalogVersionInfo -- over one
-// canonical JSON commerce document. The contract (document format, result shapes,
-// rejection codes) is docs/COMMERCE-API.md.
+// canonical JSON commerce document. The document format, result shapes and rejection codes
+// are the same in every Packvium engine.
 //
 // A malformed document or request is an *InputError. A rejection the commercial model
 // is entitled to make is not an error: it is a result document whose "status" is

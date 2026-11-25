@@ -8,7 +8,7 @@ const (
 	InvalidFixedPlacementCode = "invalid_fixed_placement"
 )
 
-// RequestErrorReasons is the closed set of reasons every engine shares (docs/ERRORS.md). A
+// RequestErrorReasons is the closed set of reasons every engine shares. A
 // fixed-placement refusal uses its own two, "malformed" and "cannot_hold".
 var RequestErrorReasons = []string{"missing_field", "wrong_type", "below_minimum", "above_maximum",
 	"negative_measure", "invalid_unit", "duplicate_id", "not_allowed", "invalid_value"}

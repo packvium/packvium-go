@@ -58,6 +58,10 @@ func latticeProfile(item *domain.Item) string {
 	// a tiling neither allows.
 	field(optionalInt(item.MaxStackedItems()))
 	field(optionalInt(item.StopIndex()))
+	// A lattice joins same-type items only, so two types may share one exactly when they share
+	// the stacking rule as well.
+	field(optionalString(item.StackingGroup()))
+	field(item.AcceptsStackingGroups().Sorted())
 	return profile.String()
 }
 
@@ -176,7 +180,9 @@ func (g GridSolver) mustDelegate(container *domain.Container, items []domain.Ite
 	}
 	// Stack density needs the cumulative column load, axles the changing moment, and a hull or
 	// a compressible item per-candidate geometry: the closed form sees none of them.
-	return container.VoidFillReserveRatio() > 0 || container.MaxStackDensity() != nil || container.Axles() != nil ||
+	// A bag's girth rule couples the axes, which only the per-candidate check applies exactly.
+	return container.VoidFillReserveRatio() > 0 || container.IsFlatBag() || container.MaxStackDensity() != nil ||
+		container.Axles() != nil ||
 		prototype.ShapeType() != domain.RigidCuboid
 }
 
@@ -184,7 +190,9 @@ func bestLattice(container *domain.Container, prototype *domain.Item, cfg *confi
 	// Every non-floor cell has one full-area direct supporter, which satisfies ratio 1, covered
 	// and single; multiple is satisfiable only on the floor, so cap the layers.
 	rule := prototype.GroundContactRule()
-	singleLayer := prototype.MustBeOnFloor() || !prototype.Stackable() || (rule != nil && *rule == "multiple")
+	// Every lattice edge joins two items of this type, so the stacking-group rule holds for the
+	// whole lattice exactly when the type carries itself.
+	singleLayer := prototype.MustBeOnFloor() || !prototype.CarriesItself() || (rule != nil && *rule == "multiple")
 	// Zero unless the item sinks into an identical one beneath it.
 	nestingTicks := int64(0)
 	if height := prototype.NestingHeight(); height != nil {

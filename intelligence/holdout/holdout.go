@@ -1,6 +1,5 @@
 // Package holdout replays a recommendation against history it was not derived from: would
-// it have improved past decisions, scored on a slice it never saw? The contract is
-// docs/INTELLIGENCE-API.md in the reference.
+// it have improved past decisions, scored on a slice it never saw?
 //
 // Three rules shape the package, and they are the difference between a backtest and a story
 // told about one.

@@ -26,7 +26,7 @@
   rear axle:  1848.6 kg of 2200 kg
 
   the same load with a 1450 kg front axle rating:
-    left behind: drinks-pallet#1, reason no_feasible_placement (observed)
+    left behind: drinks-pallet#1, reason container_inventory_exhausted (inferred)
 
   The axle rule refuses a placement rather than reporting an overload afterwards.
   Note the reason: an item the axles cannot carry is reported as the generic

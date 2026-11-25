@@ -39,8 +39,10 @@ type ContainerState struct {
 	StackSensitive       bool
 	RouteSensitive       bool
 	CompressionSensitive bool
-	MaxZ                 int64
-	Index                *SpatialIndex
+	// MaxX, MaxY and MaxZ are the largest envelope x2, y2 and z2 so far: a flat bag's
+	// running extents.
+	MaxX, MaxY, MaxZ int64
+	Index            *SpatialIndex
 	// LatticeSummary is set instead of filling Placements when the grid's lattice fast path
 	// applies.
 	LatticeSummary *domain.LatticeSummary
@@ -206,7 +208,7 @@ func (s *ContainerState) recordPlacement(placement domain.Placement, box domain.
 	s.PayloadTicks = ints.AddExact(s.PayloadTicks, item.Weight().Ticks())
 	s.StackSensitive = s.StackSensitive || item.IsStackSensitive()
 	s.RouteSensitive = s.RouteSensitive || item.StopIndex() != nil
-	s.MaxZ = ints.Max(s.MaxZ, box.Z2())
+	s.MaxX, s.MaxY, s.MaxZ = ints.Max(s.MaxX, box.X2()), ints.Max(s.MaxY, box.Y2()), ints.Max(s.MaxZ, box.Z2())
 }
 
 // PlacementSignature is id@x,y,z|... over the placements in order: the last-resort tie-break

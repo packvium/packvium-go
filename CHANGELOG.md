@@ -4,6 +4,69 @@ What changed in the Go module `github.com/packvium/packvium-go`, release by rele
 format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0]
+
+Answers every request the way Packvium 1.6.0 does in the other languages, checked byte for
+byte against the 1.6.0 conformance corpus: 435 packing requests, 12 refusal cases, 55
+commerce cases, the execution plan of every expected result, 456 operational-artifact cases,
+102 plan-revision cases, 177 malformed requests, and the 3 unsupported-placement and 9
+unpacked-reason requests every engine must answer alike.
+
+### Added
+
+- **Boxes cut to measure.** `domain.NewMadeToMeasure` and `ContainerSpec.MadeToMeasure` turn
+  a container into an on-demand box machine: `InnerDimensions` is the largest box it cuts,
+  the machine adds its smallest box, cut step, board price and weight per square metre, and
+  an outer allowance. Each trial packs into up to four boxes sized from the items, smallest
+  first, and keeps the first that takes everything. The packed container is the fabricated
+  box, priced and weighed as it ships; `PackedContainer.AchievedDimensions` is its contents'
+  extent. A JSON request that gives such a container axles, obstacles or a void-fill reserve,
+  or fixes a placement in it, is refused as an unsupported feature.
+- **Flat bags.** `ContainerSpec.DeformableBoundary = domain.FlatBag` reads `InnerDimensions`
+  as a mailer's flat length, flat width and largest thickness, and admits a load only when
+  length plus thickness and width plus thickness fit the bag. Dimensional weight is billed on
+  the load's achieved dimensions.
+- **Stacking groups.** `ItemSpec.StackingGroup` and `ItemSpec.AcceptsStackingGroups` say which
+  item may rest directly on which; an item with no group may not rest on a constrained one,
+  and `Stackable = false` still wins.
+- **The `maximum_volume` objective** (`algorithm.MaximumVolumeSolutionScorer`) ranks the share
+  of the requested volume left behind ahead of the number of pieces; the beam, block, exact and
+  container-plan searches rank their partial states the same way.
+- **A warning for items that rest on nothing.** With the default `MinimumSupportRatio` of 0, a
+  result whose placements stand above the floor on nothing ends its `Warnings` with
+  `unsupported_placements: N placement(s) rest on nothing above the container floor; set
+  configuration.minimum_support_ratio above 0 to require support`. No answer changes.
+- The JSON request API reads `container.made_to_measure`, `container.deformable_boundary`,
+  `item.stacking_group` and `item.accepts_stacking_groups`, refuses each malformed one with the
+  other engines' code, reason, field and message, and writes `achieved_dimensions` and
+  `made_to_measure.{cost_minor, tare_weight}` on the containers that have them.
+
+### Changed
+
+- **`fast` and `balanced` try the block solver as one more start** on a multi-type load, capped
+  at 100,000 lattice nodes per enumeration, and keep its answer only when it is strictly better
+  than every one of their own starts. Answers can therefore change, never for the worse; the
+  result's `termination.starts` lists the added start.
+- **An unpacked item names the limit that left it out.** An item a fresh container would take,
+  but none is left, reports `container_inventory_exhausted`; one that overloads an axle
+  wherever it stands alone reports `axle_overloaded`. Both are `inferred`. Code that matched
+  `no_feasible_placement` for these cases must match the new reason.
+- **`quality` counts a `convex_hull` item by its own solid, not its box,** when it ranks its
+  beam and when it bounds a container plan. Two wedges that fit one crate together are no
+  longer counted as needing a crate each.
+- **The exact solver ranks volume first under `maximum_volume`.**
+- The block solver counts a group of lattice nodes at once instead of one node at a time,
+  stopping on the same node under every limit.
+
+### Fixed
+
+- **`quality` refines a winning late-type ordering with a wide beam again.** When the best
+  start so far is a late-type neighbourhood (an ordering with one item type moved last), the
+  final beam refinement of it now keeps up to four candidates per item and four container
+  plans, or the profile's own width if that is smaller. In 1.5.0 that refinement ran with a
+  width of one, so it only repeated the ordering it was meant to improve. A `quality` answer
+  can therefore differ from the one 1.5.0 gave.
+
 ## [1.5.0]
 
 Answers every request the way Packvium 1.5.0 does in the other languages, checked byte for

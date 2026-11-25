@@ -70,9 +70,9 @@ type orderStrategy struct {
 // builtInStrategies are keyed behind OrderingLead, which carries priority, route stop and
 // value.
 func builtInStrategies(cfg *config.PackingConfig) []orderStrategy {
-	var strategies []orderStrategy
+	var smallFirst []orderStrategy
 	if cfg.Profile() == config.Quality {
-		strategies = append(strategies,
+		smallFirst = append(smallFirst,
 			orderStrategy{"small_edge", func(item domain.ItemInstance) SortKey {
 				dimensions := item.Item().Dimensions()
 				return leadKey(item, cfg, Int(dimensions.MaxEdge()), Big(dimensions.Volume()), Str(item.ID()))
@@ -82,25 +82,32 @@ func builtInStrategies(cfg *config.PackingConfig) []orderStrategy {
 				return leadKey(item, cfg, Big(dimensions.Volume()), Int(dimensions.MaxEdge()), Str(item.ID()))
 			}})
 	}
-	return append(strategies,
-		orderStrategy{"volume", func(item domain.ItemInstance) SortKey {
+	largeFirst := []orderStrategy{
+		{"volume", func(item domain.ItemInstance) SortKey {
 			dimensions := item.Item().Dimensions()
 			return leadKey(item, cfg, Big(negated(dimensions.Volume())), Int(-dimensions.MaxEdge()),
 				Int(-item.Item().Weight().Ticks()), Str(item.ID()))
 		}},
-		orderStrategy{"base_area", func(item domain.ItemInstance) SortKey {
+		{"base_area", func(item domain.ItemInstance) SortKey {
 			dimensions := item.Item().Dimensions()
 			return leadKey(item, cfg, Int(-dimensions.BaseArea()), Big(negated(dimensions.Volume())), Str(item.ID()))
 		}},
-		orderStrategy{"weight", func(item domain.ItemInstance) SortKey {
+		{"weight", func(item domain.ItemInstance) SortKey {
 			return leadKey(item, cfg, Int(-item.Item().Weight().Ticks()),
 				Big(negated(item.Item().Dimensions().Volume())), Str(item.ID()))
 		}},
-		orderStrategy{"constrained", func(item domain.ItemInstance) SortKey {
+		{"constrained", func(item domain.ItemInstance) SortKey {
 			return leadKey(item, cfg, Int(int64(len(item.Item().AllowedRotations()))),
 				Float(-item.Item().MinimumSupportRatio()), Big(negated(item.Item().Dimensions().Volume())),
 				Str(item.ID()))
-		}})
+		}},
+	}
+	// Small items first places the most pieces; large items first fills the most space. The
+	// objective decides which family gets the early, fully funded starts.
+	if ranksByVolume(cfg) {
+		return append(largeFirst, smallFirst...)
+	}
+	return append(smallFirst, largeFirst...)
 }
 
 // ItemOrders are the distinct item orderings a portfolio tries: built-in strategies first,
