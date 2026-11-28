@@ -1,6 +1,10 @@
 package domain
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/packvium/packvium-go/internal/refusal"
+)
 
 // The codes a request refusal carries.
 const (
@@ -60,3 +64,12 @@ func Pointer(parts ...string) string {
 	}
 	return builder.String()
 }
+
+// ObjectRefusal is a model's refusal of a value while it is built on its own (an Item, a
+// Container, a PackingConfig, a measure), before it is part of a request, so it names no
+// field. Reason is the request schema's reason for the value; Error() is the detail alone.
+// Its code is "invalid_request", as InvalidRequestError's is. The JSON path reports a
+// refusal its rules did not name as an InvalidRequestError with reason "invalid_value" and
+// this detail, the form every engine shares; Packer.Pack names the field for what it checks
+// itself.
+type ObjectRefusal = refusal.Error

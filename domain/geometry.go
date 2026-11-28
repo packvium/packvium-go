@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/internal/refusal"
 	"github.com/packvium/packvium-go/units"
 )
 
@@ -67,7 +68,7 @@ type Dimensions struct {
 // NewDimensions refuses any non-positive side.
 func NewDimensions(length, width, height units.Length) (Dimensions, error) {
 	if ints.Min(length.Ticks(), width.Ticks(), height.Ticks()) <= 0 {
-		return Dimensions{}, errors.New("all dimensions must be positive")
+		return Dimensions{}, refusal.New("invalid_value", "all dimensions must be positive")
 	}
 	return Dimensions{length, width, height}, nil
 }

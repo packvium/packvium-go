@@ -25,33 +25,35 @@ func (g DependencyGraph) Len() int { return len(g.dependsOn) }
 // DependsOn is what index depends on, ascending.
 func (g DependencyGraph) DependsOn(index int) []int { return append([]int(nil), g.dependsOn[index]...) }
 
-// IsAcyclic is a depth-first cycle check, O(V + E).
+// IsAcyclic is Kahn's algorithm: acyclic exactly when every node can be released. O(V + E).
+// Iterative, not a depth-first walk: a stack of sheets is a dependency chain as long as the
+// stack, and recursion would grow with it.
 func (g DependencyGraph) IsAcyclic() bool {
-	visiting := make([]bool, len(g.dependsOn))
-	visited := make([]bool, len(g.dependsOn))
-	var visit func(node int) bool
-	visit = func(node int) bool {
-		if visited[node] {
-			return true
+	waiting := make([]int, len(g.dependsOn))
+	for _, dependencies := range g.dependsOn {
+		for _, dependency := range dependencies {
+			waiting[dependency]++
 		}
-		if visiting[node] {
-			return false
+	}
+	var ready []int
+	for node, count := range waiting {
+		if count == 0 {
+			ready = append(ready, node)
 		}
-		visiting[node] = true
+	}
+	released := 0
+	for len(ready) > 0 {
+		node := ready[len(ready)-1]
+		ready = ready[:len(ready)-1]
+		released++
 		for _, dependency := range g.dependsOn[node] {
-			if !visit(dependency) {
-				return false
+			waiting[dependency]--
+			if waiting[dependency] == 0 {
+				ready = append(ready, dependency)
 			}
 		}
-		visiting[node], visited[node] = false, true
-		return true
 	}
-	for node := range g.dependsOn {
-		if !visit(node) {
-			return false
-		}
-	}
-	return true
+	return released == len(g.dependsOn)
 }
 
 // BuildUnloadingGraph is the unloading dependency graph: each index depends on its

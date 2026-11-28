@@ -63,7 +63,7 @@ func (s *SupportConstraint) Evaluate(context Context) Result {
 	box := context.EnvelopeBox()
 	support := CandidateView(context.Placements(), context.Item(), box)
 	supporters := support.SupporterBoxes()
-	if failure := contactRuleFailure(context.Item(), box, support.surfaces, len(supporters)); failure != "" {
+	if failure := contactRuleFailure(context.Item(), box, supporters); failure != "" {
 		return Reject("ground_contact_violation", failure)
 	}
 	required := s.required(context.Item())
@@ -96,13 +96,14 @@ func (s *SupportConstraint) Evaluate(context Context) Result {
 
 // contactRuleFailure is the refusal detail of an unmet ground contact rule, or "" when the
 // rule holds or the item declares none.
-func contactRuleFailure(item domain.ItemInstance, box domain.Box, surfaces []domain.Box, count int) string {
+func contactRuleFailure(item domain.ItemInstance, box domain.Box, supporters []domain.Box) string {
 	if !enforcesContactRule(item) {
 		return ""
 	}
+	count := len(supporters)
 	switch *item.Item().GroundContactRule() {
 	case "covered":
-		if !TouchesCorners(box, surfaces) {
+		if !TouchesCorners(box, supporters) {
 			return fmt.Sprintf("covered: %d supporter(s), not all four corners touched", count)
 		}
 	case "single":
@@ -117,17 +118,18 @@ func contactRuleFailure(item domain.ItemInstance, box domain.Box, surfaces []dom
 	return ""
 }
 
-// TouchesCorners reports whether every one of the box's four base corners rests on some
-// surface. A ratio cannot express this: 90% of the footprint concentrated in the middle
-// passes any lower ratio but leaves every corner hanging. O(4 * s).
-func TouchesCorners(box domain.Box, surfaces []domain.Box) bool {
+// TouchesCorners reports whether every one of the box's four base corners rests on one of
+// boxes. A ratio cannot express this: 90% of the footprint concentrated in the middle passes
+// any lower ratio but leaves every corner hanging. The covered rule passes only positive-area
+// supporters: a neighbour touching a corner along an edge carries nothing. O(4 * s).
+func TouchesCorners(box domain.Box, boxes []domain.Box) bool {
 	corners := [4][2]int64{
 		{box.Origin().X(), box.Origin().Y()}, {box.X2(), box.Origin().Y()},
 		{box.Origin().X(), box.Y2()}, {box.X2(), box.Y2()},
 	}
 	for _, corner := range corners {
 		touched := false
-		for _, surface := range surfaces {
+		for _, surface := range boxes {
 			if surface.Origin().X() <= corner[0] && corner[0] <= surface.X2() &&
 				surface.Origin().Y() <= corner[1] && corner[1] <= surface.Y2() {
 				touched = true

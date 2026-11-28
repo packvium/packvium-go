@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"regexp"
 	"strings"
+
+	"github.com/packvium/packvium-go/internal/refusal"
 )
 
 // Quantity is a caller-supplied magnitude before it becomes ticks: an exact integer or
@@ -50,7 +52,7 @@ var (
 	specialSyntax = regexp.MustCompile(`(?i)^[+-]?(?:inf|infinity|s?nan[0-9]*)$`)
 )
 
-// ErrDecimalSyntax reports text that is not a number at all.
+// ErrDecimalSyntax reports text that is not a number at all; a quantity's refusal wraps it.
 var ErrDecimalSyntax = errors.New("[<class 'decimal.ConversionSyntax'>]")
 
 // Rational returns the exact value of a quantity.
@@ -78,9 +80,13 @@ func parseRational(raw string) (*big.Rat, error) {
 		return fraction(mustInt(groups[1]), mustInt(groups[2]))
 	}
 	if groups := plainDecimal.FindStringSubmatch(text); groups != nil && len([]rune(groups[1])) > MaxFractionDigits {
-		return nil, errors.New("decimal has more fractional digits than a tick can distinguish")
+		return nil, refusal.New("wrong_type", "decimal has more fractional digits than a tick can distinguish")
 	}
-	return parseDecimal(text)
+	value, err := parseDecimal(text)
+	if err == ErrDecimalSyntax {
+		return nil, refusal.Wrap("wrong_type", "invalid decimal or fraction: "+text, err)
+	}
+	return value, err
 }
 
 func fraction(numerator, denominator *big.Int) (*big.Rat, error) {

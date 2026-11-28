@@ -1,12 +1,13 @@
 package domain
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"sort"
 
 	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/internal/pyrepr"
+	"github.com/packvium/packvium-go/internal/refusal"
 	"github.com/packvium/packvium-go/units"
 )
 
@@ -54,19 +55,19 @@ type RateTable struct {
 func NewRateTable(weightBracketsG, pricesMinor []int64, minimumChargeMinor, fuelSurchargePermille int64) (*RateTable, error) {
 	switch {
 	case len(weightBracketsG) == 0:
-		return nil, errors.New("rate_table requires at least one weight bracket")
+		return nil, refusal.New("invalid_value", "rate_table requires at least one weight bracket")
 	case len(weightBracketsG) != len(pricesMinor):
-		return nil, errors.New("rate_table weight_brackets_g and prices_minor must be the same length")
+		return nil, refusal.New("invalid_value", "rate_table weight_brackets_g and prices_minor must be the same length")
 	case anyAtMost(weightBracketsG, 0):
-		return nil, errors.New("rate_table weight brackets must be positive")
+		return nil, refusal.New("below_minimum", "rate_table weight brackets must be positive")
 	case !strictlyAscending(weightBracketsG):
-		return nil, errors.New("rate_table weight brackets must be strictly ascending")
+		return nil, refusal.New("invalid_value", "rate_table weight brackets must be strictly ascending")
 	case anyAtMost(pricesMinor, -1):
-		return nil, errors.New("rate_table prices cannot be negative")
+		return nil, refusal.New("below_minimum", "rate_table prices cannot be negative")
 	case minimumChargeMinor < 0:
-		return nil, errors.New("rate_table minimum_charge_minor cannot be negative")
+		return nil, refusal.New("below_minimum", "rate_table minimum_charge_minor cannot be negative")
 	case fuelSurchargePermille < 0:
-		return nil, errors.New("rate_table fuel_surcharge_permille cannot be negative")
+		return nil, refusal.New("below_minimum", "rate_table fuel_surcharge_permille cannot be negative")
 	}
 	return &RateTable{append([]int64(nil), weightBracketsG...), append([]int64(nil), pricesMinor...), minimumChargeMinor, fuelSurchargePermille}, nil
 }
@@ -190,7 +191,7 @@ func NewContainer(spec ContainerSpec) (*Container, error) {
 func validateContainer(spec ContainerSpec) error {
 	switch {
 	case spec.ID == "":
-		return errors.New("container id is required")
+		return refusal.New("invalid_value", "container id is required")
 	}
 	if spec.DeformableBoundary != "" {
 		if err := requireBagFields(spec); err != nil {
@@ -204,34 +205,34 @@ func validateContainer(spec ContainerSpec) error {
 	}
 	switch {
 	case spec.Quantity != nil && *spec.Quantity <= 0:
-		return errors.New("container quantity must be positive")
+		return refusal.New("below_minimum", "container quantity must be positive")
 	case spec.CostMinor < 0:
-		return errors.New("container cost cannot be negative")
+		return refusal.New("below_minimum", "container cost cannot be negative")
 	case !(spec.VoidFillReserveRatio >= 0 && spec.VoidFillReserveRatio <= 1):
-		return errors.New("void_fill_reserve_ratio must be between 0 and 1")
+		return refusal.Ratio(spec.VoidFillReserveRatio, "void_fill_reserve_ratio must be between 0 and 1")
 	}
 	if err := validateAxles(spec); err != nil {
 		return err
 	}
 	for _, limit := range spec.TagLimits {
 		if limit < 1 {
-			return errors.New("tag_limits must be at least 1")
+			return refusal.New("below_minimum", "tag_limits must be at least 1")
 		}
 	}
 	if spec.MaxItems != nil && *spec.MaxItems < 1 {
-		return errors.New("container max_items must be at least 1")
+		return refusal.New("below_minimum", "container max_items must be at least 1")
 	}
 	if err := ValidateDirections(spec.AccessDirections); err != nil {
 		return err
 	}
 	if spec.OuterDimensions != nil && !spec.InnerDimensions.FitsInside(*spec.OuterDimensions) {
-		return errors.New("outer dimensions cannot be smaller than inner dimensions")
+		return refusal.New("invalid_value", "outer dimensions cannot be smaller than inner dimensions")
 	}
 	boundary := NewBox(Point{}, spec.InnerDimensions)
 	for _, obstacle := range spec.Obstacles {
 		for _, box := range obstacle.boxes {
 			if !boundary.Contains(box) {
-				return fmt.Errorf("obstacle %s lies outside container", obstacle.id)
+				return refusal.New("invalid_value", fmt.Sprintf("obstacle %s lies outside container", obstacle.id))
 			}
 		}
 	}
@@ -242,7 +243,7 @@ func validateContainer(spec ContainerSpec) error {
 // for, in the reference's order.
 func requireBagFields(spec ContainerSpec) error {
 	if spec.DeformableBoundary != FlatBag {
-		return fmt.Errorf("unknown deformable_boundary kind '%s'", spec.DeformableBoundary)
+		return refusal.New("not_allowed", "unknown deformable_boundary kind "+pyrepr.String(spec.DeformableBoundary))
 	}
 	refused := []struct {
 		name    string
@@ -254,7 +255,7 @@ func requireBagFields(spec ContainerSpec) error {
 	}
 	for _, field := range refused {
 		if field.present {
-			return fmt.Errorf("%s cannot be combined with deformable_boundary", field.name)
+			return refusal.New("not_allowed", field.name+" cannot be combined with deformable_boundary")
 		}
 	}
 	return nil
@@ -266,10 +267,10 @@ func validateAxles(spec ContainerSpec) error {
 	}
 	front, rear := spec.Axles[0], spec.Axles[1]
 	if front.position.Ticks() >= rear.position.Ticks() {
-		return errors.New("the front axle must be strictly nearer the origin than the rear axle")
+		return refusal.New("invalid_value", "the front axle must be strictly nearer the origin than the rear axle")
 	}
 	if rear.position.Ticks() > spec.InnerDimensions.Length().Ticks() {
-		return errors.New("axle positions must lie within the container's length")
+		return refusal.New("invalid_value", "axle positions must lie within the container's length")
 	}
 	return nil
 }

@@ -70,3 +70,13 @@ func (w Weight) ToMap(unit string) map[string]interface{} {
 	}
 	return map[string]interface{}{"ticks": w.ticks, "value": value, "unit": unit}
 }
+
+// weightUnitCodes are the codes the request schema names wherever it asks for a weight unit
+// by itself.
+var weightUnitCodes = []string{"mg", "g", "kg", "oz", "lb"}
+
+// WeightUnitCodes is a fresh copy of the schema's weight unit codes, in its order.
+func WeightUnitCodes() []string { return append([]string(nil), weightUnitCodes...) }
+
+// IsWeightUnitCode reports whether code is one of the schema's weight unit codes, exactly.
+func IsWeightUnitCode(code string) bool { return isCode(code, weightUnitCodes) }

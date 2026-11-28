@@ -28,6 +28,16 @@ func IsOrientation(value interface{}) bool {
 	return false
 }
 
+// OrientationRule is the orientation rule as the request-error tables word a closed
+// vocabulary.
+func OrientationRule() string {
+	spelled := make([]interface{}, len(Orientations))
+	for index, code := range Orientations {
+		spelled[index] = code
+	}
+	return "must be one of " + canonicaljson.Spelling(spelled)
+}
+
 // Refusal builds an error from its message and the pointer of the bad value.
 type Refusal func(message, field string) error
 

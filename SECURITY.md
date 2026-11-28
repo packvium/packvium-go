@@ -38,6 +38,11 @@ The realistic risks are therefore about untrusted **input**:
   maximum before passing them in.
 - **Malformed input.** Bad units, unparseable numbers and contradictory constraints return
   errors rather than producing a wrong packing. Do not ignore those errors.
+- **Untrusted results.** `validation.ValidateResult` reads any result document, including one
+  an engine you do not run produced. It computes with exact integers of any size and its
+  pairwise checks are quadratic in the placements of a container, so bound the size of a
+  document before you validate it. A document it cannot read is refused with a
+  `*validation.MalformedResult`, never half-judged.
 
 A result that reports success has passed independent validation, but validation checks the
 constraints you declared. It cannot know about a constraint you did not express.

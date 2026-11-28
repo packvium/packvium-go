@@ -83,7 +83,7 @@ func validatePlacement(event map[string]interface{}) error {
 		return err
 	}
 	if !pointshape.IsOrientation(placement["orientation"]) {
-		return refuse("invalid_event", "placement.orientation is one of the six codes")
+		return refuse("invalid_event", "placement.orientation %s", pointshape.OrientationRule())
 	}
 	instance := interface{}(int64(1))
 	if given, present := placement["container_instance"]; present {

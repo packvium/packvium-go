@@ -1,9 +1,10 @@
 package domain
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
+
+	"github.com/packvium/packvium-go/internal/refusal"
 )
 
 // Made-to-measure containers.
@@ -40,13 +41,13 @@ func NewMadeToMeasure(minimum, increment [3]int64, costPerSquareMetreMinor, tare
 	outerAllowance [3]int64) (*MadeToMeasure, error) {
 	switch {
 	case minOf(minimum) <= 0:
-		return nil, errors.New("made_to_measure minimum must be positive")
+		return nil, refusal.New("invalid_value", "made_to_measure minimum must be positive")
 	case minOf(increment) <= 0:
-		return nil, errors.New("made_to_measure increment must be positive")
+		return nil, refusal.New("invalid_value", "made_to_measure increment must be positive")
 	case costPerSquareMetreMinor < 0 || tarePerSquareMetre < 0:
-		return nil, errors.New("made_to_measure prices cannot be negative")
+		return nil, refusal.New("below_minimum", "made_to_measure prices cannot be negative")
 	case minOf(outerAllowance) < 0:
-		return nil, errors.New("made_to_measure outer_allowance cannot be negative")
+		return nil, refusal.New("negative_measure", "made_to_measure outer_allowance cannot be negative")
 	}
 	return &MadeToMeasure{minimum, increment, outerAllowance, costPerSquareMetreMinor, tarePerSquareMetre}, nil
 }
@@ -73,10 +74,10 @@ func (m *MadeToMeasure) TarePerSquareMetre() int64      { return m.tarePerSquare
 func (m *MadeToMeasure) admits(maximum [3]int64) error {
 	for axis, name := range axisNames {
 		if m.minimum[axis] > maximum[axis] {
-			return fmt.Errorf("made_to_measure minimum %s exceeds inner_dimensions", name)
+			return refusal.New("invalid_value", fmt.Sprintf("made_to_measure minimum %s exceeds inner_dimensions", name))
 		}
 		if (maximum[axis]-m.minimum[axis])%m.increment[axis] != 0 {
-			return fmt.Errorf("made_to_measure increment %s does not divide inner_dimensions minus minimum", name)
+			return refusal.New("invalid_value", fmt.Sprintf("made_to_measure increment %s does not divide inner_dimensions minus minimum", name))
 		}
 	}
 	return nil

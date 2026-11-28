@@ -2,9 +2,10 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 
+	"github.com/packvium/packvium-go/internal/pyrepr"
+	"github.com/packvium/packvium-go/internal/refusal"
 	"github.com/packvium/packvium-go/units"
 )
 
@@ -113,7 +114,7 @@ func (b *EffortBudget) Validate() error {
 	}
 	for _, field := range limits {
 		if field.limit != nil && *field.limit < 1 {
-			return fmt.Errorf("effort_budget.%s must be at least 1", field.name)
+			return refusal.New("below_minimum", "effort_budget."+field.name+" must be at least 1")
 		}
 	}
 	return nil
@@ -128,15 +129,21 @@ func New(options Options) (*PackingConfig, error) {
 	switch {
 	case options.TimeLimitMS <= 0 || options.TopK <= 0 || options.ExactItemLimit <= 0 || options.MultiStartOrders <= 0 ||
 		options.MaxCandidatesPerItem <= 0 || options.ContainerPlanBeamWidth <= 0 || options.ContainerPlanNodeLimit <= 0:
-		return nil, errors.New("positive configuration values required")
+		return nil, refusal.New("below_minimum", "positive configuration values required")
 	case options.MaxContainers != nil && *options.MaxContainers < 1:
-		return nil, errors.New("max_containers must be at least 1")
+		return nil, refusal.New("below_minimum", "max_containers must be at least 1")
 	case options.MaxCandidatePoints < 16:
-		return nil, errors.New("max_candidate_points must be at least 16")
+		return nil, refusal.New("below_minimum", "max_candidate_points must be at least 16")
 	case !(options.MinimumSupportRatio >= 0 && options.MinimumSupportRatio <= 1):
-		return nil, errors.New("minimum_support_ratio must be between 0 and 1")
+		return nil, refusal.Ratio(options.MinimumSupportRatio, "minimum_support_ratio must be between 0 and 1")
 	case options.DimensionalWeightDivisor != nil && *options.DimensionalWeightDivisor <= 0:
-		return nil, errors.New("dimensional_weight_divisor must be positive")
+		return nil, refusal.New("below_minimum", "dimensional_weight_divisor must be positive")
+	case !units.IsLengthUnitCode(options.DimensionalWeightLengthUnit):
+		return nil, refusal.New("not_allowed", "dimensional_weight_length_unit must be one of "+
+			pyrepr.StringList(units.LengthUnitCodes()))
+	case !units.IsWeightUnitCode(options.DimensionalWeightWeightUnit):
+		return nil, refusal.New("not_allowed", "dimensional_weight_weight_unit must be one of "+
+			pyrepr.StringList(units.WeightUnitCodes()))
 	}
 	frozen := options
 	frozen.Solvers = append([]string(nil), options.Solvers...)

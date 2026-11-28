@@ -32,7 +32,7 @@ const Format = "packvium-operational-artifact/v1"
 // SuiteVersion is the suite version of this builder, the same string in every engine of one
 // release. The engine's own name is deliberately not recorded: correct builders naming
 // themselves would emit different documents.
-const SuiteVersion = "1.6.0"
+const SuiteVersion = "1.7.0"
 
 // SolverFields are the deterministic part of result.algorithm. duration_ms is wall-clock time
 // and never enters an artifact.

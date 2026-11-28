@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// The Python examples' output at v1.6.0, kept beside the programs so the test runs wherever
+// The Python examples' output at v1.7.0, kept beside the programs so the test runs wherever
 // the module does, with no checkout of the suite repository.
 const referenceDirectory = "testdata"
 

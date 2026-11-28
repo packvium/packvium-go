@@ -69,7 +69,7 @@ func groundContactProblem(present []domain.Placement) *constraint.Violation {
 	}
 	support := constraint.CandidateView(present[:len(present)-1], candidate.Instance(), box)
 	count := len(support.Supporters())
-	violated := (*rule == "covered" && !constraint.TouchesCorners(box, support.Surfaces())) ||
+	violated := (*rule == "covered" && !constraint.TouchesCorners(box, support.SupporterBoxes())) ||
 		(*rule == "single" && count != 1) || (*rule == "multiple" && count < 2)
 	if violated {
 		return &constraint.Violation{Code: "ground_contact_violation", Detail: candidate.Instance().ID()}

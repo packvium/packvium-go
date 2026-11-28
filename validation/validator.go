@@ -2,6 +2,9 @@
 // alone. It shares no state with the solvers, so a solver that reports a placement it never
 // verified is caught here rather than reaching the caller.
 //
+// Validate checks the packer's own objects. ValidateResult judges any engine's result as JSON
+// against its JSON request and reports the reference validator's issues.
+//
 // For n placements in one container: O(n log n + n * a) for the collision sweep (a the
 // per-level active set), O(n * k) for the per-placement checks with k obstacle boxes, and
 // O(n^2) only when pair-dependent rules (tags, support) are present, the same bound as the

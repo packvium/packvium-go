@@ -618,7 +618,7 @@ func TestTheWorkOrderIsTheReferencePage(t *testing.T) {
 		"<tr><td>Replay</td><td>exact</td></tr>",
 		"<tr><td>Solver</td><td>balanced / extreme_point / seed 7</td></tr>",
 		"<tr><td>Catalogs</td><td>cartons v3</td></tr>",
-		"<tr><td>Packvium</td><td>1.6.0</td></tr>",
+		"<tr><td>Packvium</td><td>1.7.0</td></tr>",
 		"</table>",
 		`<section class="container">`,
 		"<h2>Container 1: crate</h2>",

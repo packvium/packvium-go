@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/packvium/packvium-go/internal/jsonvalue"
+	objectrefusal "github.com/packvium/packvium-go/internal/refusal"
 	"github.com/packvium/packvium-go/units"
 )
 
@@ -276,17 +277,15 @@ func quantity(value interface{}, kind string) (units.Quantity, error) {
 	case *big.Int:
 		return units.BigQuantity(typed), nil
 	case bool:
-		if typed {
-			return units.IntQuantity(1), nil
-		}
-		return units.IntQuantity(0), nil
+		// A boolean is a number to the reference's arithmetic, but never a measure anyone wrote.
+		return units.Quantity{}, objectrefusal.New("wrong_type", "a boolean is not a measure")
 	case string:
 		return units.TextQuantity(typed), nil
 	case float64:
 		// A fraction in binary floating point is not the decimal the caller wrote; an integral
 		// float is exact, and JavaScript cannot send anything else for 100.
 		if typed != math.Trunc(typed) || math.IsInf(typed, 0) {
-			return units.Quantity{}, fmt.Errorf("float %s input is intentionally rejected; use a decimal string", kind)
+			return units.Quantity{}, objectrefusal.New("wrong_type", fmt.Sprintf("float %s input is intentionally rejected; use a decimal string", kind))
 		}
 		whole, _ := big.NewFloat(typed).Int(nil)
 		return units.BigQuantity(whole), nil

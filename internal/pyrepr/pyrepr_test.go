@@ -26,3 +26,12 @@ func TestMatchesTheReferenceRepr(t *testing.T) {
 		}
 	}
 }
+
+func TestPrintableReadsTheEmbeddedTable(t *testing.T) {
+	for r, want := range map[rune]bool{'a': true, 0x7f: false, 0xa0: false, 0xad: false, 0xe9: true, 0x378: false,
+		0x4e00: true, 0x2028: false, 0xe000: false, 0x1f600: true} {
+		if Printable(r) != want {
+			t.Errorf("%U: %v", r, !want)
+		}
+	}
+}

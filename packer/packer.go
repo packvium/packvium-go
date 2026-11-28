@@ -50,11 +50,17 @@ func (p *Packer) Pack(items []*domain.Item, containers []*domain.Container) (*re
 
 // PackWithFixedPlacements is Pack with items pinned before the solve. Fixed items take the
 // first instances of their type, their containers open first and are always kept, and the
-// solve packs around them. A fixed set that is not a valid packing on its own is refused with
+// solve packs around them. A fixed set that is not a valid packing on its own, or a placement
+// with an empty id, an unknown orientation or a container instance below one, is refused with
 // a *domain.InvalidRequestError whose Code is "invalid_fixed_placement".
 func (p *Packer) PackWithFixedPlacements(items []*domain.Item, containers []*domain.Container,
 	fixed []domain.FixedPlacement) (packed *result.PackingResult, err error) {
 	defer algorithm.RecoverRefusal(&err)
+	// The JSON path's rules, with its reason and field: a request built from objects is refused
+	// exactly where the same request as JSON would be.
+	if err := checkObjects(p.cfg, items, containers, fixed); err != nil {
+		return nil, err
+	}
 	request, err := domain.NewPackingRequest(items, containers)
 	if err != nil {
 		return nil, err

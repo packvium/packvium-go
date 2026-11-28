@@ -11,6 +11,7 @@ import (
 	"github.com/packvium/packvium-go/config"
 	"github.com/packvium/packvium-go/domain"
 	"github.com/packvium/packvium-go/hull"
+	objectrefusal "github.com/packvium/packvium-go/internal/refusal"
 	policyModule "github.com/packvium/packvium-go/policy"
 	"github.com/packvium/packvium-go/units"
 )
@@ -127,7 +128,7 @@ func decodeChecked(request map[string]interface{}) (*DecodedRequest, error) {
 	}
 	return &DecodedRequest{
 		Config: packingConfig, Items: decodedItems, Containers: decodedContainers,
-		OutputLengthUnit: output.text("length_unit", unit), OutputWeightUnit: output.text("weight_unit", weightUnit),
+		OutputLengthUnit: output.text("length_unit", units.OutputLengthUnit(unit)), OutputWeightUnit: output.text("weight_unit", weightUnit),
 		CatalogVersionsUsed: references, Policy: policy, FixedPlacements: fixed, rules: &rules,
 	}, nil
 }
@@ -279,11 +280,25 @@ func effortBudget(cfg object) (*config.EffortBudget, error) {
 		{"max_search_nodes", &budget.MaxSearchNodes}, {"max_restarts", &budget.MaxRestarts},
 	}
 	for _, field := range targets {
+		// Only what cannot be compared at all is refused here, as the budget's constructor
+		// refuses it; an integral float or a boolean is the request rules' to judge.
+		if value, present := raw.get(field.key); present && !isNumber(value) {
+			return nil, objectrefusal.New("wrong_type", "effort_budget."+field.key+" must be an integer")
+		}
 		if *field.target, err = raw.optionalInteger(field.key); err != nil {
 			return nil, err
 		}
 	}
 	return budget, nil
+}
+
+// isNumber is a JSON number or a boolean, what the reference compares as a number.
+func isNumber(value interface{}) bool {
+	switch value.(type) {
+	case int64, *big.Int, float64, bool:
+		return true
+	}
+	return false
 }
 
 func decodeDimensions(value interface{}, unit string) (domain.Dimensions, error) {

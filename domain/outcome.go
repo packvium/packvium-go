@@ -1,8 +1,9 @@
 package domain
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/packvium/packvium-go/internal/refusal"
 )
 
 // RejectionObservation is one reason code observed while trying to place an item.
@@ -78,22 +79,22 @@ type PackingRequest struct {
 // NewPackingRequest refuses an empty side or duplicate ids.
 func NewPackingRequest(items []*Item, containers []*Container) (*PackingRequest, error) {
 	if len(items) == 0 {
-		return nil, errors.New("at least one item is required")
+		return nil, refusal.New("invalid_value", "at least one item is required")
 	}
 	if len(containers) == 0 {
-		return nil, errors.New("at least one container is required")
+		return nil, refusal.New("invalid_value", "at least one container is required")
 	}
 	itemIDs := map[string]bool{}
 	for _, item := range items {
 		if itemIDs[item.ID()] {
-			return nil, errors.New("item ids must be unique")
+			return nil, refusal.New("duplicate_id", "item ids must be unique")
 		}
 		itemIDs[item.ID()] = true
 	}
 	containerIDs := map[string]bool{}
 	for _, container := range containers {
 		if containerIDs[container.ID()] {
-			return nil, errors.New("container ids must be unique")
+			return nil, refusal.New("duplicate_id", "container ids must be unique")
 		}
 		containerIDs[container.ID()] = true
 	}

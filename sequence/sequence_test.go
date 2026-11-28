@@ -141,3 +141,18 @@ func TestNoDirectionLeavesEveryPlacementStuck(t *testing.T) {
 	equal(t, map[string]interface{}{"code": "sequence_stuck",
 		"stuck": []interface{}{int64(0), int64(1), int64(2), int64(3), int64(4)}}, stuck.ToMap())
 }
+
+// An 1,100-sheet stack is an 1,100-long chain; the cycle check is iterative, and a cycle
+// behind a tail is still found.
+func TestADependencyChainOfElevenHundredIsChecked(t *testing.T) {
+	chain := make([][]int, 1_100)
+	for level := 0; level < 1_099; level++ {
+		chain[level] = []int{level + 1}
+	}
+	if !NewDependencyGraph(chain).IsAcyclic() {
+		t.Fatal("a chain is acyclic")
+	}
+	if NewDependencyGraph([][]int{{1}, {2}, {1}}).IsAcyclic() {
+		t.Fatal("a cycle behind a tail is a cycle")
+	}
+}

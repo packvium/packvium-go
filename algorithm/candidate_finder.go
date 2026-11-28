@@ -129,9 +129,29 @@ func scanOrder(state *ContainerState, item domain.ItemInstance, cfg *config.Pack
 		scan = scan[:minInt(cap, len(scan))]
 	}
 	if state.Container.Axles() != nil {
-		scan = append(scan, axleBalancedPoints(state, item, forms)...)
+		scan = appendUnseen(scan, axleBalancedPoints(state, item, forms))
 	}
 	return scan
+}
+
+// appendUnseen is points then the extra points not already offered, keeping their order. A
+// repeated point is the same candidate scanned twice: it can change nothing but the counted
+// effort. O(k + a) for k offered and a extra points.
+func appendUnseen(points, extra []domain.Point) []domain.Point {
+	fresh := make(map[domain.Point]bool, len(extra))
+	for _, point := range extra {
+		fresh[point] = true
+	}
+	for _, point := range points {
+		delete(fresh, point)
+	}
+	for _, point := range extra {
+		if fresh[point] {
+			delete(fresh, point)
+			points = append(points, point)
+		}
+	}
+	return points
 }
 
 func minInt(left, right int) int {
@@ -183,6 +203,9 @@ func axleBalancedPoints(state *ContainerState, item domain.ItemInstance, forms [
 	if len(floorYs) == 0 {
 		floorYs = []int64{0}
 	}
+	// Ascending, as the reference scans them: the order moves which point a counted stop
+	// lands on.
+	sort.Slice(floorYs, func(left, right int) bool { return floorYs[left] < floorYs[right] })
 	axles := *container.Axles()
 	var points []domain.Point
 	for _, candidate := range forms {

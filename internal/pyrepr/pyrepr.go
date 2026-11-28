@@ -5,8 +5,8 @@ package pyrepr
 
 import (
 	"fmt"
+	"sort"
 	"strings"
-	"unicode"
 )
 
 // String is repr(text) for a str: single quotes unless the text holds a single quote and no
@@ -42,9 +42,7 @@ func writeRune(builder *strings.Builder, r, quote rune) {
 		fmt.Fprintf(builder, `\x%02x`, r)
 	case r < 0x7f:
 		builder.WriteRune(r)
-	case unicode.IsPrint(r):
-		// Go's printable set (letters, marks, numbers, punctuation, symbols) is the
-		// reference's str.isprintable() for every character outside ASCII.
+	case Printable(r):
 		builder.WriteRune(r)
 	case r <= 0xff:
 		fmt.Fprintf(builder, `\x%02x`, r)
@@ -53,4 +51,26 @@ func writeRune(builder *strings.Builder, r, quote rune) {
 	default:
 		fmt.Fprintf(builder, `\U%08x`, r)
 	}
+}
+
+// StringList is repr(list) of strings: each item's repr, comma-separated, in brackets.
+func StringList(texts []string) string {
+	quoted := make([]string, len(texts))
+	for index, text := range texts {
+		quoted[index] = String(text)
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
+}
+
+// Printable is the reference's str.isprintable for one code point, from the embedded Unicode
+// 14.0.0 table rather than the runtime's, so every Go release prints the same. O(log r).
+func Printable(r rune) bool {
+	if r >= 0x20 && r < 0x7f {
+		return true
+	}
+	if r < 0x20 {
+		return false
+	}
+	at := sort.Search(len(nonPrintable), func(index int) bool { return nonPrintable[index][1] >= r })
+	return at == len(nonPrintable) || r < nonPrintable[at][0]
 }

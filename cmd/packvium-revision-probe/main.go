@@ -7,6 +7,10 @@
 // a request through the ordinary JSON entry point and answers "admitted", or the refusal with
 // its "reason" and "field" as well. A refusal is an outcome, not a failure,
 // so the probe exits 0 unless it cannot run at all, and then 255.
+//
+// "packvium-revision-probe validate" answers result-validation cases instead: stdin is a JSON
+// list of {"request": text, "result": text}, and each line is {"issues": [{"code", "detail"}]}
+// or {"refusal": {"kind", "message"}}.
 package main
 
 import (
@@ -19,12 +23,45 @@ import (
 	"github.com/packvium/packvium-go/internal/jsonvalue"
 	"github.com/packvium/packvium-go/revisions"
 	"github.com/packvium/packvium-go/serialization"
+	"github.com/packvium/packvium-go/validation"
 )
 
 const fatalStatus = 255
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "validate" {
+		os.Exit(validateCases(os.Stdin, os.Stdout, os.Stderr))
+	}
 	os.Exit(run(os.Stdin, os.Stdout, os.Stderr))
+}
+
+func validateCases(stdin io.Reader, stdout, stderr io.Writer) int {
+	var cases []struct {
+		Request string `json:"request"`
+		Result  string `json:"result"`
+	}
+	if err := json.NewDecoder(stdin).Decode(&cases); err != nil {
+		return fatal(stderr, err)
+	}
+	encoder := json.NewEncoder(stdout)
+	for _, testCase := range cases {
+		if err := encoder.Encode(validationOutcome(testCase.Request, testCase.Result)); err != nil {
+			return fatal(stderr, err)
+		}
+	}
+	return 0
+}
+
+func validationOutcome(request, result string) map[string]interface{} {
+	issues, err := validation.ValidateResult([]byte(request), []byte(result))
+	if refusal, refused := err.(*validation.MalformedResult); refused {
+		return map[string]interface{}{"refusal": map[string]interface{}{"kind": refusal.Kind, "message": refusal.Message}}
+	}
+	listed := make([]map[string]interface{}, len(issues))
+	for index, issue := range issues {
+		listed[index] = map[string]interface{}{"code": issue.Code, "detail": issue.Detail}
+	}
+	return map[string]interface{}{"issues": listed}
 }
 
 func run(stdin io.Reader, stdout, stderr io.Writer) int {
@@ -109,6 +146,13 @@ func admit(request interface{}) map[string]interface{} {
 	if refusal, refused := err.(*domain.InvalidRequestError); refused {
 		return map[string]interface{}{"error": refusal.Code, "message": refusal.Error(), "json": nil,
 			"reason": refusal.Reason, "field": refusal.Field}
+	}
+	if refusal, refused := err.(*domain.ObjectRefusal); refused {
+		return map[string]interface{}{"error": domain.InvalidRequestCode, "message": refusal.Error(), "json": nil,
+			"reason": refusal.Reason, "field": ""}
+	}
+	if _, unsupported := err.(*serialization.UnsupportedFeatureError); unsupported {
+		return map[string]interface{}{"error": "unsupported_feature", "message": err.Error(), "json": nil}
 	}
 	return map[string]interface{}{"error": "other", "message": err.Error(), "json": nil}
 }

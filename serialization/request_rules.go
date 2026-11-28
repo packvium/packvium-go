@@ -14,10 +14,14 @@ import (
 
 // checkRequest walks the request schema's rules over the raw JSON before any model is built
 // and refuses the request with its first violation, in the order every engine follows:
-// units, configuration, items, containers. O(size of the request).
+// units, output, configuration, each item, item ids, each container, container ids. O(size of
+// the request).
 func checkRequest(request map[string]interface{}) error {
 	unit, err := checkUnits(request["units"])
 	if err != nil {
+		return err
+	}
+	if err := checkOutput(request["output"]); err != nil {
 		return err
 	}
 	if err := checkConfiguration(request["configuration"], unit); err != nil {
@@ -241,6 +245,50 @@ var objectives = []string{"default", "lowest_cost", "shipping_cost", "lowest_lan
 
 var accessDirections = []string{"+x", "-x", "+y", "-y", "+z", "-z"}
 
+// The schema's other closed vocabularies, each refused as not_allowed at its own pointer.
+var (
+	solverNames         = []string{"grid", "extreme_points", "homogeneous_blocks", "layer", "maximal_spaces", "exact_small"}
+	rotationCodes       = []string{"LWH", "LHW", "WLH", "WHL", "HLW", "HWL"}
+	groundContactRules  = []string{"free", "covered", "single", "multiple"}
+	shapeTypes          = []string{"rigid_cuboid", "convex_hull", "compressible"}
+	lengthUnitCodes     = units.LengthUnitCodes()
+	weightUnitCodes     = units.WeightUnitCodes()
+	lengthUnitCodeRule  = oneOf(lengthUnitCodes)
+	weightUnitCodeRule  = oneOf(weightUnitCodes)
+	rotationCodesRule   = eachOneOf(rotationCodes)
+	solverNamesRule     = eachOneOf(solverNames)
+	groundContactRule   = oneOf(groundContactRules)
+	shapeTypeRule       = oneOf(shapeTypes)
+	accessDirectionRule = eachOneOf(accessDirections)
+)
+
+func eachOneOf(allowed []string) rule {
+	member := oneOf(allowed)
+	return func(raw interface{}, where string) error {
+		values, err := listAt(raw, where)
+		if err != nil {
+			return err
+		}
+		for index, value := range values {
+			if err := member(value, where+domain.Pointer(strconv.Itoa(index))); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func checkOutput(raw interface{}) error {
+	if raw == nil {
+		return nil
+	}
+	output, err := objectAt(raw, "/output")
+	if err != nil {
+		return err
+	}
+	return checkFields(output, "/output", []fieldRule{{"length_unit", lengthUnitCodeRule}, {"weight_unit", weightUnitCodeRule}})
+}
+
 // configurationFields is every key the request schema's `configuration` declares; it sets
 // `additionalProperties: false`.
 var configurationFields = []string{"alternatives", "clearance", "container_plan_beam_width",
@@ -285,6 +333,10 @@ func checkConfiguration(raw interface{}, unit string) error {
 		return err
 	}
 	if err := optional(configuration, "objective", where, oneOf(objectives)); err != nil {
+		return err
+	}
+	if err := checkFields(configuration, where, []fieldRule{{"solvers", solverNamesRule},
+		{"dimensional_weight_length_unit", lengthUnitCodeRule}, {"dimensional_weight_weight_unit", weightUnitCodeRule}}); err != nil {
 		return err
 	}
 	for _, field := range configurationIntegers {
@@ -351,12 +403,26 @@ func checkItem(raw interface{}, where, unit string) error {
 	}
 	return checkFields(item, where, []fieldRule{
 		{"weight", measure(weightMeasure, weightUnit)}, {"max_top_load", measure(weightMeasure, weightUnit)},
-		{"nesting_height", measure(lengthMeasure, unit)}, {"max_stacked_items", atLeast(1)},
+		{"nesting_height", measure(lengthMeasure, unit)},
+		{"nesting_height", func(value interface{}, field string) error { return nestingBelowHeight(value, field, sides, unit) }},
+		{"max_stacked_items", atLeast(1)},
 		{"stop_index", atLeast(0)}, {"value", atLeast(0)},
 		{"max_compression_pressure_kpa", atLeast(0)}, {"minimum_support_ratio", ratio(&one)},
 		{"compression_ratio", ratio(nil)}, {"stacking_group", stackingGroupName},
-		{"accepts_stacking_groups", stackingGroupNames},
+		{"accepts_stacking_groups", stackingGroupNames}, {"allowed_rotations", rotationCodesRule},
+		{"ground_contact_rule", groundContactRule}, {"shape_type", shapeTypeRule},
 	})
+}
+
+// nestingBelowHeight holds a nested copy to sinking by less than its own height, or it would
+// vanish into the one below; both measures have passed their own rules already. O(1).
+func nestingBelowHeight(value interface{}, field string, sides interface{}, unit string) error {
+	nesting, _ := parseLength(value, unit)
+	height, _ := parseLength(sides.(map[string]interface{})["height"], unit)
+	if nesting.Ticks() >= height.Ticks() {
+		return refusal("invalid_value", field, "must be less than the item's height")
+	}
+	return nil
 }
 
 func stackingGroupName(value interface{}, field string) error {
@@ -406,7 +472,7 @@ func checkContainer(raw interface{}, where, unit string) error {
 		{"tare_weight", measure(weightMeasure, weightUnit)}, {"max_payload", measure(weightMeasure, weightUnit)},
 		{"max_stack_density", measure(weightMeasure, weightUnit)}, {"max_items", atLeast(1)},
 		{"cost_minor", atLeast(0)}, {"void_fill_reserve_ratio", ratio(&one)},
-		{"access_directions", checkAccessDirections},
+		{"access_directions", accessDirectionRule},
 		{"tag_limits", checkTagLimits}, {"rate_table", checkRateTable},
 		{"obstacles", func(value interface{}, field string) error { return checkObstacles(value, field, unit) }},
 		{"deformable_boundary", func(value interface{}, field string) error {
@@ -547,19 +613,6 @@ func dimensions(raw interface{}, where, unit string) error {
 			return err
 		}
 		if err := measure(lengthMeasure, unit)(value, where+domain.Pointer(side)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func checkAccessDirections(raw interface{}, where string) error {
-	values, err := listAt(raw, where)
-	if err != nil {
-		return err
-	}
-	for index, value := range values {
-		if err := oneOf(accessDirections)(value, where+domain.Pointer(strconv.Itoa(index))); err != nil {
 			return err
 		}
 	}

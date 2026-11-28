@@ -112,7 +112,7 @@ func TestARequestThatIsNotAnObjectIsRefusedAsAWhole(t *testing.T) {
 }
 
 func TestWhatTheRulesDoNotNameStillArrivesAsARequestError(t *testing.T) {
-	refusal := refusalOf(t, setItem("shape_type", "blob"))
+	refusal := refusalOf(t, setItem("hull_vertices", []interface{}{}))
 	if refusal.Code != "invalid_request" || refusal.Reason != "invalid_value" || refusal.Field != "" {
 		t.Errorf("%#v", refusal)
 	}
@@ -183,7 +183,7 @@ func TestRefusalsTheRuleTableLeavesToTheModelBuilders(t *testing.T) {
 		message string
 	}{
 		{"null obstacle origin axis", withObstacle(map[string]interface{}{"x": nil}, "p"),
-			"invalid_request: [<class 'decimal.ConversionSyntax'>]"},
+			"invalid_request: invalid decimal or fraction: None"},
 		{"list tag", setItem("tags", []interface{}{[]interface{}{}}), "invalid_request: unhashable type: 'list'"},
 		{"object tag", setItem("tags", []interface{}{map[string]interface{}{}}), "invalid_request: unhashable type: 'dict'"},
 		{"list incompatible tag", setItem("incompatible_tags", []interface{}{[]interface{}{int64(1)}}),
@@ -196,8 +196,6 @@ func TestRefusalsTheRuleTableLeavesToTheModelBuilders(t *testing.T) {
 			"invalid_request: int() argument must be a string, a bytes-like object or a real number, not 'list'"},
 		{"object seed", setConfiguration("seed", map[string]interface{}{"value": "1"}),
 			"invalid_request: int() argument must be a string, a bytes-like object or a real number, not 'dict'"},
-		{"number solvers", setConfiguration("solvers", int64(1)), "invalid_request: 'int' object is not iterable"},
-		{"boolean solvers", setConfiguration("solvers", true), "invalid_request: 'bool' object is not iterable"},
 	}
 	for _, testCase := range cases {
 		refusal := refusalOf(t, testCase.edit)
@@ -211,36 +209,44 @@ func setConfiguration(key string, value interface{}) func(map[string]interface{}
 	return func(r map[string]interface{}) { r["configuration"].(map[string]interface{})[key] = value }
 }
 
-// TestSolversAreIteratedAsTheReferenceIteratesThem: an empty object is no solver at all, and
-// a string is its characters, each an unknown solver name.
-func TestSolversAreIteratedAsTheReferenceIteratesThem(t *testing.T) {
-	request := validRequest()
-	setConfiguration("solvers", map[string]interface{}{})(request)
-	if _, err := Pack(request); err != nil {
-		t.Fatalf("an empty object of solvers was refused: %v", err)
+// TestSolversMustBeAListOfKnownNames: anything but a list is mistyped, and an unknown name is
+// not allowed at its own index.
+func TestSolversMustBeAListOfKnownNames(t *testing.T) {
+	for _, value := range []interface{}{map[string]interface{}{}, "x", int64(1), true} {
+		refusal := refusalOf(t, setConfiguration("solvers", value))
+		if refusal.Reason != "wrong_type" || refusal.Field != "/configuration/solvers" {
+			t.Errorf("%v: %#v", value, refusal)
+		}
 	}
-	request = validRequest()
-	setConfiguration("solvers", "x")(request)
-	if _, err := Pack(request); err == nil || !strings.Contains(err.Error(), "unknown solver name(s) ['x']") {
-		t.Fatalf("got %v", err)
+	refusal := refusalOf(t, setConfiguration("solvers", []interface{}{"grid", "simplex"}))
+	if refusal.Reason != "not_allowed" || refusal.Field != "/configuration/solvers/1" {
+		t.Errorf("%#v", refusal)
 	}
 }
 
 // TestAPolicyIsRefusedBeforeAnItemAsTheReferenceOrdersThem: the reference compiles the
-// policy after the configuration and the catalog references and before any item.
+// policy after the configuration and the catalog references and before any item is built;
+// an item the rule table refuses is refused before either.
 func TestAPolicyIsRefusedBeforeAnItemAsTheReferenceOrdersThem(t *testing.T) {
 	badPolicy := func(r map[string]interface{}) { r["policy"] = "not a rule set" }
+	badHull := setItem("hull_vertices", []interface{}{})
 	alone := refusalOf(t, badPolicy)
 	both := refusalOf(t, func(r map[string]interface{}) {
 		badPolicy(r)
-		setItem("shape_type", "blob")(r)
+		badHull(r)
 	})
 	if both.Error() != alone.Error() || both.Reason != "invalid_value" {
 		t.Errorf("refused for %q, the policy alone for %q", both.Error(), alone.Error())
 	}
-	item := refusalOf(t, setItem("shape_type", "blob"))
-	if item.Error() == alone.Error() {
+	if item := refusalOf(t, badHull); item.Error() == alone.Error() {
 		t.Fatal("the two refusals cannot be told apart")
+	}
+	ruled := refusalOf(t, func(r map[string]interface{}) {
+		badPolicy(r)
+		setItem("shape_type", "blob")(r)
+	})
+	if ruled.Reason != "not_allowed" || ruled.Field != "/items/0/shape_type" {
+		t.Errorf("%#v", ruled)
 	}
 }
 

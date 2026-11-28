@@ -32,7 +32,7 @@
   a mug and the teapot recorded in the same place
     HTTP 422  {"code": "invalid_fixed_placement", "reason": "cannot_hold", "field": "/fixed_placements", "message": "The items already loaded cannot stay as recorded: collision: teapot#1 with mug#1."}
   an orientation code that does not exist
-    HTTP 422  {"code": "invalid_fixed_placement", "reason": "malformed", "field": "/fixed_placements/0/orientation", "message": "The items already loaded cannot stay as recorded: fixed_placements[0].orientation is one of the six codes."}
+    HTTP 422  {"code": "invalid_fixed_placement", "reason": "malformed", "field": "/fixed_placements/0/orientation", "message": "The items already loaded cannot stay as recorded: fixed_placements[0].orientation must be one of [\"LWH\",\"LHW\",\"WLH\",\"WHL\",\"HLW\",\"HWL\"]."}
 
   `cannot_hold` means the fixed set is well formed but is not a valid packing on its
   own, and `field` is the whole list. `malformed` points at the one bad value.

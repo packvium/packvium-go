@@ -76,6 +76,10 @@ func (s *HomogeneousBlockSolver) PackOne(container *domain.Container, sequence i
 			break
 		}
 		solution := packBlocks(container, sequence, items, cfg, stats, deadline, mode, nodeLimit, lattices)
+		if cfg.Profile() == config.Quality && !deadline.Expired() {
+			solution = blockLookahead(container, sequence, items, cfg, stats, deadline, mode,
+				nodeLimit*blockLookaheadNodeFactor, lattices, solution)
+		}
 		reached = reached || solution.TimeLimitReached
 		if best == nil || blockSolutionKey(solution, byVolume).Compare(blockSolutionKey(*best, byVolume)) < 0 {
 			kept := solution
@@ -118,10 +122,22 @@ func unrestricted(item *domain.Item) bool {
 func blockSolutionKey(solution SingleContainerSolution, byVolume bool) SortKey {
 	if byVolume {
 		return SortKey{Big(negated(solution.State.UsedVolume)), Int(int64(len(solution.Unpacked))),
-			Int(solution.State.MaxZ), Str(solution.State.PlacementSignature())}
+			Int(solution.State.MaxZ), Nested(placementTuples(solution.State))}
 	}
 	return SortKey{Int(int64(len(solution.Unpacked))), Big(negated(solution.State.UsedVolume)),
-		Int(solution.State.MaxZ), Str(solution.State.PlacementSignature())}
+		Int(solution.State.MaxZ), Nested(placementTuples(solution.State))}
+}
+
+// placementTuples is the placements in order as (id, x, y, z) envelope origins, compared
+// field by field: the reference's last tie-break between two block answers is this tuple, not
+// a signature string, and the two order coordinates differently ("10" before "9"). O(m).
+func placementTuples(state *ContainerState) SortKey {
+	tuples := make(SortKey, len(state.Placements))
+	for index, placement := range state.Placements {
+		origin := placement.EnvelopeOrigin()
+		tuples[index] = Nested(SortKey{Str(placement.Instance().ID()), Int(origin.X()), Int(origin.Y()), Int(origin.Z())})
+	}
+	return tuples
 }
 
 // remainingByType is the unplaced instances per declared id, walked in code-point order of
@@ -172,36 +188,151 @@ type block struct {
 	lead int64
 }
 
-func packBlocks(container *domain.Container, sequence int64, items []domain.ItemInstance, cfg *config.PackingConfig,
-	stats *SearchStats, deadline *Deadline, mode blockMode, nodeLimit int64,
-	lattices map[latticeKey]latticeSummary) SingleContainerSolution {
-	state := NewContainerState(container, sequence)
-	spaces := []Space{{domain.Point{}, container.InnerDimensions()}}
+// The quality block lookahead completes this many leading blocks per round, within
+// blockLookaheadNodeFactor times the mode's lattice node limit.
+const (
+	blockLookaheadWidth      = 4
+	blockLookaheadNodeFactor = 64
+)
+
+func (r *remainingByType) copy() *remainingByType {
+	other := &remainingByType{ids: r.ids, instances: make(map[string][]domain.ItemInstance, len(r.instances))}
+	for id, available := range r.instances {
+		// The solver only reslices, never appends, so the backing arrays can be shared.
+		other.instances[id] = available
+	}
+	return other
+}
+
+// blockSearch is one block solve from the empty container: its state, free spaces, unplaced
+// instances and each type's rotations.
+type blockSearch struct {
+	state     *ContainerState
+	spaces    []Space
+	remaining *remainingByType
+	forms     map[string][]blockForm
+}
+
+func newBlockSearch(container *domain.Container, sequence int64, items []domain.ItemInstance,
+	cfg *config.PackingConfig) blockSearch {
 	remaining := newRemainingByType(items)
 	forms := map[string][]blockForm{}
 	for _, id := range remaining.ids {
 		forms[id] = blockForms(remaining.instances[id][0], cfg)
 	}
-	round := blockRound{container, state, cfg, stats, deadline, mode, nodeLimit, lattices, 0}
+	return blockSearch{NewContainerState(container, sequence), []Space{{domain.Point{}, container.InnerDimensions()}},
+		remaining, forms}
+}
+
+func (s blockSearch) copy() blockSearch {
+	return blockSearch{s.state.Copy(), s.spaces, s.remaining.copy(), s.forms}
+}
+
+// commit places every member of chosen and removes its box from the free spaces.
+func (s *blockSearch) commit(chosen *block, cfg *config.PackingConfig, stats *SearchStats) {
+	available := s.remaining.instances[chosen.itemID]
+	s.remaining.instances[chosen.itemID] = available[chosen.count:]
+	commitBlock(s.state, chosen, available[:chosen.count], cfg, stats)
+	blockDimensions := domain.MustDimensions(chosen.nx*chosen.envelope.Length().Ticks(),
+		chosen.ny*chosen.envelope.Width().Ticks(), chosen.nz*chosen.envelope.Height().Ticks())
+	s.spaces = SubtractAll(s.spaces, []domain.Box{domain.NewBox(chosen.space.Origin, blockDimensions)}, stats)
+}
+
+func packBlocks(container *domain.Container, sequence int64, items []domain.ItemInstance, cfg *config.PackingConfig,
+	stats *SearchStats, deadline *Deadline, mode blockMode, nodeLimit int64,
+	lattices map[latticeKey]latticeSummary) SingleContainerSolution {
+	round := blockRound{container, cfg, stats, deadline, mode, nodeLimit, lattices, 0}
+	solution := round.complete(newBlockSearch(container, sequence, items, cfg))
+	solution.TimeLimitReached = solution.TimeLimitReached || deadline.Expired()
+	return solution
+}
+
+// complete commits each round's leading block until nothing more fits, mutating search. The
+// answer is marked stopped only when a limit cut a round, which then commits nothing.
+func (r *blockRound) complete(search blockSearch) SingleContainerSolution {
 	reached := false
-	for len(spaces) > 0 && remaining.any() {
-		best, cut := round.next(spaces, remaining, forms)
+	for len(search.spaces) > 0 && search.remaining.any() {
+		leading, cut := r.leading(search, 1)
 		if cut {
 			reached = true
 			break
 		}
-		if best == nil {
+		if len(leading) == 0 {
 			break
 		}
-		available := remaining.instances[best.itemID]
-		chosen := available[:best.count]
-		remaining.instances[best.itemID] = available[best.count:]
-		commitBlock(state, best, chosen, cfg, stats)
-		blockDimensions := domain.MustDimensions(best.nx*best.envelope.Length().Ticks(),
-			best.ny*best.envelope.Width().Ticks(), best.nz*best.envelope.Height().Ticks())
-		spaces = SubtractAll(spaces, []domain.Box{domain.NewBox(best.space.Origin, blockDimensions)}, stats)
+		search.commit(leading[0], r.cfg, r.stats)
 	}
-	return SingleContainerSolution{State: state, Unpacked: remaining.all(), TimeLimitReached: reached || deadline.Expired()}
+	return SingleContainerSolution{State: search.state, Unpacked: search.remaining.all(), TimeLimitReached: reached}
+}
+
+// completion is the greedy completion after committing chosen, on a copy of the round's
+// search.
+func (r *blockRound) completion(search blockSearch, chosen *block) SingleContainerSolution {
+	trial := search.copy()
+	trial.commit(chosen, r.cfg, r.stats)
+	return r.complete(trial)
+}
+
+// blockLookahead is greedy, or a better answer from completing each round's leading blocks.
+// Each round ranks its blockLookaheadWidth leading blocks, completes each greedily on a copy
+// and commits the block whose completion ranks best. The greedy answer is the first
+// completion, so the result is never worse than it; the round's first block is the greedy
+// choice after the block committed last, so its completion is already known and is not
+// recomputed, unless the greedy pass was stopped by a limit, when the first round completes
+// it under the lookahead's larger budget. The work counts against its own nodeBudget lattice
+// nodes; when that runs out the best completion so far stands, and only the deadline or the
+// effort budget marks the answer as stopped by a limit. Each round costs at most W + 1
+// completions of the greedy pass's O(B*S*T*R*X*Y), all inside nodeBudget lattice nodes.
+func blockLookahead(container *domain.Container, sequence int64, items []domain.ItemInstance,
+	cfg *config.PackingConfig, stats *SearchStats, deadline *Deadline, mode blockMode, nodeBudget int64,
+	lattices map[latticeKey]latticeSummary, greedy SingleContainerSolution) SingleContainerSolution {
+	byVolume := ranksByVolume(cfg)
+	round := blockRound{container, cfg, stats, deadline, mode, nodeBudget, lattices, 0}
+	search := newBlockSearch(container, sequence, items, cfg)
+	best, bestKey := greedy, blockSolutionKey(greedy, byVolume)
+	var known *SingleContainerSolution
+	if !greedy.TimeLimitReached {
+		known = &greedy
+	}
+	for len(search.spaces) > 0 && search.remaining.any() {
+		leading, cut := round.leading(search, blockLookaheadWidth)
+		if cut || len(leading) == 0 {
+			break
+		}
+		var chosen *lookaheadChoice
+		trials := leading
+		if known != nil {
+			chosen = &lookaheadChoice{blockSolutionKey(*known, byVolume), *known, leading[0]}
+			trials = leading[1:]
+		}
+		for _, candidate := range trials {
+			trial := round.completion(search, candidate)
+			if trial.TimeLimitReached {
+				cut = true
+				break
+			}
+			key := blockSolutionKey(trial, byVolume)
+			if chosen == nil || key.Compare(chosen.key) < 0 {
+				chosen = &lookaheadChoice{key, trial, candidate}
+			}
+		}
+		if cut || chosen == nil {
+			break
+		}
+		known = &chosen.solution
+		if chosen.key.Compare(bestKey) < 0 {
+			best, bestKey = chosen.solution, chosen.key
+		}
+		search.commit(chosen.block, cfg, stats)
+	}
+	return SingleContainerSolution{State: best.State, Unpacked: best.Unpacked,
+		TimeLimitReached: best.TimeLimitReached || deadline.Expired()}
+}
+
+type lookaheadChoice struct {
+	key      SortKey
+	solution SingleContainerSolution
+	block    *block
 }
 
 // blockForm is one unique rotation of a type with its envelope and physical volume.
@@ -256,7 +387,6 @@ func blockLattice(key latticeKey) latticeSummary {
 // blockRound is one mode's search state across its rounds: the node count it has spent.
 type blockRound struct {
 	container *domain.Container
-	state     *ContainerState
 	cfg       *config.PackingConfig
 	stats     *SearchStats
 	deadline  *Deadline
@@ -267,23 +397,23 @@ type blockRound struct {
 }
 
 // capacity is how many of a type one block may still take: stock, item limit and payload.
-func (r *blockRound) capacity(available []domain.ItemInstance) int64 {
+func (r *blockRound) capacity(state *ContainerState, available []domain.ItemInstance) int64 {
 	capacity := int64(len(available))
 	if limit := r.container.MaxItems(); limit != nil {
-		capacity = ints.Min(capacity, *limit-r.state.PlacementCount())
+		capacity = ints.Min(capacity, *limit-state.PlacementCount())
 	}
 	if payload := r.container.MaxPayload(); payload != nil && available[0].Item().Weight().Ticks() > 0 {
-		capacity = ints.Min(capacity, (payload.Ticks()-r.state.PayloadTicks)/available[0].Item().Weight().Ticks())
+		capacity = ints.Min(capacity, (payload.Ticks()-state.PayloadTicks)/available[0].Item().Weight().Ticks())
 	}
 	return capacity
 }
 
-// next is one round's winning block, or cut when a limit stopped the round, which then
-// commits nothing. A group's nodes are counted at once: its first node polls the deadline as
-// a per-node loop would, and a counted limit falling inside the group is charged exactly the
-// nodes such a loop would have expanded before stopping. O(S * T * R) groups per round, each
-// O(X * Y) on a memo miss.
-func (r *blockRound) next(spaces []Space, remaining *remainingByType, forms map[string][]blockForm) (*block, bool) {
+// leading is one round's leaders leading blocks, best first, or cut when a limit stopped the
+// round, which then commits nothing. A group's nodes are counted at once: its first node
+// polls the deadline as a per-node loop would, and a counted limit falling inside the group
+// is charged exactly the nodes such a loop would have expanded before stopping. O(S * T * R)
+// groups per round, each O(X * Y) on a memo miss, plus O(W) to keep W leaders.
+func (r *blockRound) leading(search blockSearch, leaders int) ([]*block, bool) {
 	ceiling := r.deadline.searchNodeCeiling(r.stats)
 	type eligible struct {
 		id       string
@@ -291,26 +421,26 @@ func (r *blockRound) next(spaces []Space, remaining *remainingByType, forms map[
 	}
 	// Capacity reads only the committed state, so it is fixed for the whole round.
 	var types []eligible
-	for _, id := range remaining.ids {
-		if available := remaining.instances[id]; len(available) > 0 {
-			if capacity := r.capacity(available); capacity > 0 {
+	for _, id := range search.remaining.ids {
+		if available := search.remaining.instances[id]; len(available) > 0 {
+			if capacity := r.capacity(search.state, available); capacity > 0 {
 				types = append(types, eligible{id, capacity})
 			}
 		}
 	}
-	var best *block
-	for _, space := range spaces {
+	var leading []*block
+	for _, space := range search.spaces {
 		length, width, height := space.Dimensions.Length().Ticks(), space.Dimensions.Width().Ticks(),
 			space.Dimensions.Height().Ticks()
 		for _, candidate := range types {
-			for _, form := range forms[candidate.id] {
+			for _, form := range search.forms[candidate.id] {
 				columns := ints.Min(length/form.envelope.Length().Ticks(), candidate.capacity)
 				rows := width / form.envelope.Width().Ticks()
 				if columns == 0 || rows == 0 {
 					continue
 				}
 				if r.nodes >= r.nodeLimit || r.deadline.Expired() {
-					return best, true
+					return leading, true
 				}
 				key := latticeKey{columns, rows, height / form.envelope.Height().Ticks(), candidate.capacity}
 				summary, known := r.lattices[key]
@@ -327,29 +457,31 @@ func (r *blockRound) next(spaces []Space, remaining *remainingByType, forms map[
 				if summary.nodes > budget {
 					r.stats.SearchNodesExpanded += budget
 					r.nodes += budget
-					return best, true
+					return leading, true
 				}
 				r.nodes += summary.nodes
 				r.stats.SearchNodesExpanded += summary.nodes
 				if summary.count > 0 {
-					best = r.better(best, space, candidate.id, form, summary)
+					leading = r.keep(leading, leaders, space, candidate.id, form, summary)
 				}
 			}
 		}
 	}
-	return best, false
+	return leading, false
 }
 
-// better is best, or this group's winning block when its key ranks strictly ahead.
-func (r *blockRound) better(best *block, space Space, itemID string, form blockForm, summary latticeSummary) *block {
+// keep is leading with this group's winning block among the leaders when its key ranks
+// strictly ahead of the last kept one; equal keys keep their arrival order.
+func (r *blockRound) keep(leading []*block, leaders int, space Space, itemID string, form blockForm,
+	summary latticeSummary) []*block {
 	count := summary.count
-	usedVolume := new(big.Int).Mul(big.NewInt(count), form.volume)
-	// The key's first field is -count or -used volume; a group that loses on it loses.
-	if best != nil {
-		if r.mode == countMode && -count > best.lead {
-			return best
-		}
+	full := len(leading) == leaders
+	// The key's first field is -count or -used volume; a group that loses on it to the last
+	// kept block loses on the key, so its key is never built.
+	if full && r.mode == countMode && -count > leading[len(leading)-1].lead {
+		return leading
 	}
+	usedVolume := new(big.Int).Mul(big.NewInt(count), form.volume)
 	fill := new(big.Int).Mul(usedVolume, scorePPM)
 	spaceFill := exactInt64(fill.Quo(fill, space.Dimensions.Volume()))
 	var score SortKey
@@ -360,11 +492,22 @@ func (r *blockRound) better(best *block, space Space, itemID string, form blockF
 	}
 	score = append(score, Int(space.Origin.Z()), Int(space.Origin.Y()), Int(space.Origin.X()), Str(itemID),
 		Str(string(form.rotation)), Int(summary.nx), Int(summary.ny), Int(summary.nz))
-	if best != nil && score.Compare(best.score) >= 0 {
-		return best
+	if full && score.Compare(leading[len(leading)-1].score) >= 0 {
+		return leading
 	}
-	return &block{space, itemID, form.rotation, form.physical, form.envelope, summary.nx, summary.ny, summary.nz,
+	at := len(leading)
+	for at > 0 && score.Compare(leading[at-1].score) < 0 {
+		at--
+	}
+	kept := &block{space, itemID, form.rotation, form.physical, form.envelope, summary.nx, summary.ny, summary.nz,
 		count, score, -count}
+	leading = append(leading, nil)
+	copy(leading[at+1:], leading[at:])
+	leading[at] = kept
+	if len(leading) > leaders {
+		leading = leading[:leaders]
+	}
+	return leading
 }
 
 func commitBlock(state *ContainerState, chosen *block, instances []domain.ItemInstance, cfg *config.PackingConfig,

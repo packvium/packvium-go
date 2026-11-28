@@ -68,7 +68,7 @@ func requireFixedShape(raw interface{}, where, field, unit string) error {
 		}
 	}
 	if !pointshape.IsOrientation(entry["orientation"]) {
-		return malformed(where+".orientation is one of the six codes", field+"/orientation")
+		return malformed(where+".orientation "+pointshape.OrientationRule(), field+"/orientation")
 	}
 	if instance, ok := containerInstance(entry); !ok || instance < 1 {
 		return malformed(where+".container_instance counts from 1", field+"/container_instance")

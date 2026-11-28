@@ -1,9 +1,6 @@
 package domain
 
-import (
-	"errors"
-	"fmt"
-)
+import "fmt"
 
 // FixedPlacement is an item already in a known place before the solve: loaded, or locked
 // there. It is addressed by container type and instance rather than by a result's container
@@ -17,12 +14,12 @@ type FixedPlacement struct {
 	containerInstance int64
 }
 
-// NewFixedPlacement refuses an instance below one: instances count from 1.
+// NewFixedPlacement is a placement as given; it never fails. Every rule on its fields
+// (instances count from 1, ids are non-empty) is checked where the placement sits in a request,
+// by Packer.PackWithFixedPlacements, with the JSON path's refusal and pointer. The error stays
+// so no 1.x caller breaks.
 func NewFixedPlacement(itemID, containerID string, position Point, rotation Rotation,
 	containerInstance int64) (FixedPlacement, error) {
-	if containerInstance < 1 {
-		return FixedPlacement{}, errors.New("container_instance counts from 1")
-	}
 	return FixedPlacement{itemID, containerID, position, rotation, containerInstance}, nil
 }
 

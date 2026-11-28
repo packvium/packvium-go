@@ -265,8 +265,8 @@ func refinementOf(placeholder start, results []RawSolution, completed map[string
 }
 
 // runsGreedy reports whether a start keeps one candidate per item: the greedy orderings and
-// their late-type neighbourhoods. A :beam refinement of a winning neighbourhood still carries
-// :late_ in its name, yet it is the one start meant to search wide.
+// their late-type neighbourhoods. A refinement of a winning neighbourhood, named ":beam",
+// still carries ":late_" in its name, yet it is the one start meant to search wide.
 func runsGreedy(orderName string) bool {
 	if strings.HasSuffix(orderName, ":beam") {
 		return false

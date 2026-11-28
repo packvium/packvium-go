@@ -70,3 +70,40 @@ func (l Length) ToMap(unit string) map[string]interface{} {
 	}
 	return map[string]interface{}{"ticks": l.ticks, "value": value, "unit": unit}
 }
+
+// lengthUnitCodes are the codes the request schema names wherever it asks for a length unit
+// by itself (an output unit, a dimensional-weight unit). A measure's own unit may also be
+// spelt out ("inch").
+var lengthUnitCodes = []string{"mm", "cm", "m", "in", "ft"}
+
+// LengthUnitCodes is a fresh copy of the schema's length unit codes, in its order.
+func LengthUnitCodes() []string { return append([]string(nil), lengthUnitCodes...) }
+
+// OutputLengthUnit is the unit a request without output.length_unit is written in: the
+// request's own units.length spelt as the schema's output code, case and surrounding space
+// ignored and a spelt-out name folded to its code ("Inches" is "in"). A unit no output code
+// names, the internal tick, gives "mm", the default of both blocks.
+func OutputLengthUnit(requestUnit string) string {
+	multiplier, err := LengthUnitTicks(requestUnit)
+	if err != nil {
+		return "mm"
+	}
+	for _, code := range lengthUnitCodes {
+		if lengthScale.multipliers[code] == multiplier {
+			return code
+		}
+	}
+	return "mm"
+}
+
+// IsLengthUnitCode reports whether code is one of the schema's length unit codes, exactly.
+func IsLengthUnitCode(code string) bool { return isCode(code, lengthUnitCodes) }
+
+func isCode(code string, codes []string) bool {
+	for _, candidate := range codes {
+		if code == candidate {
+			return true
+		}
+	}
+	return false
+}

@@ -11,8 +11,8 @@
 ==============================================================================
 2. What happened on the dock, recorded against that plan
 ==============================================================================
-  revision 1, parent sha256:bbae70a388073005...
-  approved artifact sha256:3441110469cb5b93..., replay exact
+  revision 1, parent sha256:dca411d758cdc261...
+  approved artifact sha256:44676302610a345e..., replay exact
   slabs still to pack: 1
   fixed placements:    1
 

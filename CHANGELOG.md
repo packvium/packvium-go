@@ -4,6 +4,67 @@ What changed in the Go module `github.com/packvium/packvium-go`, release by rele
 format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0]
+
+Answers every request the way Packvium 1.7.0 does in the other languages, checked byte for
+byte against the 1.7.0 conformance corpus: 451 packing requests, 12 refusal cases, 55
+commerce cases, the execution plan of every expected result, 472 operational-artifact cases,
+102 plan-revision cases, 207 malformed requests, the 3 unsupported-placement and 12
+unpacked-reason requests every engine must answer alike, and 5,451 result-validation cases.
+Every 1.6.0 expected result keeps its bytes.
+
+### Added
+
+- **`validation.ValidateResult(request, result)`** judges any engine's result against its
+  request, both as JSON text, and returns the reference validator's issues: the same codes
+  and details, in the same order (`[]validation.ResultIssue`). It recomputes units,
+  geometry, support, load, reserves and the objective from the documents alone. Documents it
+  cannot judge are refused with a `*validation.MalformedResult` of kind `contract` or
+  `shape`. Support, void-fill reserve and compression ratios are judged in parts per million
+  exactly as the solvers convert them.
+- **`*domain.ObjectRefusal`.** A model constructor that refuses a value (`domain.NewItem`,
+  `domain.NewContainer`, `domain.NewRateTable`, `domain.NewMadeToMeasure`, `config.New`, a
+  measure) now says why with the request schema's reason (`below_minimum`, `invalid_value`,
+  `not_allowed`, `negative_measure`, `invalid_unit`, `wrong_type`, ...). Its message is the
+  text the constructor returned before.
+
+### Changed
+
+- **`quality` looks ahead in the block solver.** Each round completes its four leading blocks
+  greedily and commits the one whose completion ranks best, within 64 times
+  `container_plan_node_limit` lattice nodes. The answer is never worse than the greedy one;
+  under a tight effort budget the block start can now report `truncated` where it reported
+  complete.
+- **Every closed vocabulary of the request schema is refused as `not_allowed` at its own
+  pointer:** `allowed_rotations`, `shape_type`, `ground_contact_rule`,
+  `configuration.solvers`, the output and dimensional-weight units and a fixed placement's
+  `orientation`. `ticks` is refused as an output unit. A `nesting_height` not below the
+  item's height is `invalid_value` at its pointer. These were refused before without a
+  pointer, or as another kind of error.
+- **A measure's unit is matched ignoring case and surrounding space**, at every measure
+  (output and dimensional-weight units stay the exact lower-case codes), and a request with
+  no `output` block is written in its own `units.length` (`tick` writes `mm`).
+- **Several mistakes in one request are refused for the first in one documented order**:
+  unsupported fields, units, output units, configuration, each item, item ids, each
+  container, container ids, fixed placements.
+- **A request built from domain objects is refused exactly as its JSON would be.**
+  `Packer.PackWithFixedPlacements` checks the request in the JSON order and names the field:
+  a count past 2^53 - 1, an empty stacking group name, a repeated id, a fixed placement with
+  an empty id or a container instance below 1 (`domain.NewFixedPlacement` no longer refuses
+  that itself).
+
+### Fixed
+
+- **`covered` ground contact counts only boxes the item rests on.** A neighbour touching a
+  corner along an edge carried nothing but counted as covering it.
+- **A route-order violation names the lowest-index blocker**, the one every engine names.
+- **An axle-balanced candidate point already offered is not offered again**, and floor
+  positions are scanned in ascending order. Only the counted effort could change.
+- **A negative `seed` shuffles as the other engines shuffle it.**
+- Tall stacks are walked iteratively: no recursion depth grows with the height of a stack.
+- When two block-solver answers tie on everything else, they are ordered by their
+  placements field by field, as the other engines order them.
+
 ## [1.6.0]
 
 Answers every request the way Packvium 1.6.0 does in the other languages, checked byte for

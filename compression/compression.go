@@ -9,6 +9,7 @@ import (
 	"math/big"
 
 	"github.com/packvium/packvium-go/internal/ints"
+	"github.com/packvium/packvium-go/internal/refusal"
 	"github.com/packvium/packvium-go/units"
 )
 
@@ -91,7 +92,13 @@ func EffectiveHeightTicks(heightTicks, ratioPPM, maxPressureKPA int64, pressure 
 // RatioToPPM applies the public ratio rule floor(ratio * 10^6 + 0.5) once, at the boundary.
 func RatioToPPM(ratio float64) (int64, error) {
 	if !(ratio >= 0 && ratio <= 1) {
-		return 0, errors.New("compression_ratio must be between zero and one")
+		// Below zero is the schema's floor; the schema sets no ceiling, so above one stays the
+		// catch-all invalid_value every engine answers.
+		reason := "invalid_value"
+		if ratio < 0 {
+			reason = "below_minimum"
+		}
+		return 0, refusal.New(reason, "compression_ratio must be between zero and one")
 	}
 	// The explicit conversion rounds the product before the addition; without it Go may fuse
 	// the two into one multiply-add and round differently from the reference.

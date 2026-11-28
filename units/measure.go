@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+
+	"github.com/packvium/packvium-go/internal/refusal"
 )
 
 // scale is one physical quantity's unit table: ticks per named unit.
@@ -29,7 +31,7 @@ func (s scale) multiplier(unit string, strict bool) (int64, error) {
 	}
 	value, ok := s.multipliers[key]
 	if !ok {
-		return 0, fmt.Errorf("unsupported %s unit: %s", s.name, unit)
+		return 0, refusal.New("invalid_unit", fmt.Sprintf("unsupported %s unit: %s", s.name, unit))
 	}
 	return value, nil
 }
@@ -47,7 +49,7 @@ func (s scale) ticks(quantity Quantity, unit string, rounding Rounding) (int64, 
 	value.Mul(value, new(big.Rat).SetInt64(multiplier))
 	rounded := Round(value, rounding)
 	if rounded.Sign() < 0 {
-		return 0, fmt.Errorf("%s cannot be negative", s.name)
+		return 0, refusal.New("negative_measure", s.name+" cannot be negative")
 	}
 	if !rounded.IsInt64() {
 		return 0, fmt.Errorf("%s exceeds the 64-bit tick range", s.name)

@@ -8,10 +8,10 @@ It accepts the same requests as every Packvium engine. Python, PHP, Java, .NET a
 The reference engine is the Python package, `packvium`; every release of this module is
 checked against its results byte for byte.
 
-> **Version 1.6.0.** This release corresponds to Packvium 1.6.0 in the other languages, and
-> it was checked against the 1.6.0 conformance corpus: every packing request, every commerce case, the
+> **Version 1.7.0.** This release corresponds to Packvium 1.7.0 in the other languages, and
+> it was checked against the 1.7.0 conformance corpus: every packing request, every commerce case, the
 > execution plan and operational artifact of every expected result, every structured request
-> error and every plan-revision case. Field names, status codes and the objective vector stay
+> error, every plan-revision case and every result-validation case. Field names, status codes and the objective vector stay
 > the same for all of 1.x.
 
 ## Contents
@@ -26,6 +26,7 @@ checked against its results byte for byte.
 - [Execution plans](#execution-plans)
 - [Operator locks](#operator-locks)
 - [Operational artifacts](#operational-artifacts)
+- [Validating a result](#validating-a-result)
 - [Fixed placements and plan revisions](#fixed-placements-and-plan-revisions)
 - [Weight rebalancing](#weight-rebalancing)
 - [Scenarios, recommendations and holdout replay](#scenarios-recommendations-and-holdout-replay)
@@ -39,7 +40,7 @@ checked against its results byte for byte.
 ## Install
 
 ```bash
-go get github.com/packvium/packvium-go@v1.6.0
+go get github.com/packvium/packvium-go@v1.7.0
 ```
 
 Go 1.13 or newer. The module is checked on a real Go 1.13 toolchain, so projects that
@@ -164,8 +165,14 @@ key they do not declare is refused with reason `not_allowed` and its own pointer
 ignored, so a misspelt `profile` for `solver_profile` or `top_k` for `alternatives` no longer
 runs on defaults. When several keys are unknown, the first in code point order is named.
 `parallel` is refused the same way: running starts concurrently is an execution setting, not
-part of the request. An unknown `objective`, or an `access_directions` entry that is not one of
-the six walls, is `not_allowed` with its pointer too.
+part of the request. Every closed vocabulary of the schema is checked the same way: an unknown
+`objective`, `configuration.solvers` name, output or dimensional-weight unit code,
+`allowed_rotations` code, `shape_type`, `ground_contact_rule` or `access_directions` wall is
+`not_allowed` with its pointer. Output and dimensional-weight units must be one of the
+lower-case codes, and `ticks` is not one; a measure's own unit (`units.length`, `"10 cm"`,
+`{"unit": " KG "}`) is matched ignoring case and surrounding space. A `nesting_height` not below the item's own height is
+`invalid_value` at its pointer. With no `output` block, a result is written in the request's
+`units.length`, spelt as its schema code.
 
 ```go
 _, err = serialization.Pack(map[string]interface{}{
@@ -180,9 +187,22 @@ if errors.As(err, &refusal) {
 }
 ```
 
+A request with several mistakes is refused for the first in one documented order: an
+unsupported field, the units, the output units, the configuration, each item, the item ids,
+each container, the container ids, the fixed placements.
+
 The other refusals keep their own types: `*serialization.UnsupportedFeatureError`,
-`*algorithm.UnknownSolverError`, `*algorithm.UnknownObjectiveError` (a cost objective
-without the divisor it needs) and `*policy.PolicyError`.
+`*algorithm.UnknownSolverError` and `*algorithm.UnknownObjectiveError` (for a configuration
+built in Go; a JSON request names them as `not_allowed`), and `*policy.PolicyError`.
+
+A request built from domain objects is held to the same rules. A constructor that refuses
+its own value (`domain.NewItem`, `domain.NewContainer`, `config.New`, a measure) returns a
+`*domain.ObjectRefusal` whose `Reason` is the schema's reason for the value and whose message
+is the detail alone, because the object does not yet know where in a request it will sit.
+`Packer.PackWithFixedPlacements` then checks the whole request in the JSON order and refuses
+with the JSON path's `*domain.InvalidRequestError`, field and message included: a quantity or
+count past 2^53 - 1, an empty stacking group name, a repeated id, a fixed placement whose
+container instance is below 1.
 [`examples/errors`](examples/errors) turns each kind into the response a web handler
 would send.
 
@@ -416,6 +436,36 @@ engine reads back. `artifacts.ReplayLevel(result)` answers `exact` or `not_guara
 promise an artifact of that result would make, without building one.
 [`examples/artifacts`](examples/artifacts) builds and exports one.
 
+## Validating a result
+
+`validation.ValidateResult(request, result)` judges any engine's result against its request,
+both as JSON text, and returns the issues the reference validator returns for the same
+documents: the same codes, the same details, in the same order. It shares no code with the
+solver: units, geometry, support, load and the objective vector are recomputed from the two
+documents, so it catches a defect inside the engine as well as a hand-edited result. An empty
+list means valid. Documents it cannot judge at all are refused with a
+`*validation.MalformedResult` whose `Kind` is `contract` (the result lacks the documented
+shape) or `shape` (a value of the wrong type, text that is not JSON).
+
+```go
+request := []byte(`{"items": [{"id": "cube", "dimensions": {"length": "100", "width": "100", "height": "100"}}],
+  "containers": [{"id": "box", "inner_dimensions": {"length": "200", "width": "200", "height": "200"}}]}`)
+var decoded interface{}
+if err := json.Unmarshal(request, &decoded); err != nil {
+	log.Fatal(err)
+}
+packed, err := serialization.Pack(decoded)
+if err != nil {
+	log.Fatal(err)
+}
+result, err := json.Marshal(packed)
+if err != nil {
+	log.Fatal(err)
+}
+issues, err := validation.ValidateResult(request, result)
+fmt.Println(len(issues), err) // 0 <nil>
+```
+
 ## Fixed placements and plan revisions
 
 A request's `fixed_placements` pins items that are already loaded, or locked in place,
@@ -603,8 +653,8 @@ places, none of which shows up in the conformance corpus:
 
 ## Versions and milestones
 
-The module's versions follow the Packvium releases: 1.6.0 here answers every request the way
-Packvium 1.6.0 does in the other languages. Within 1.x, field names, status codes and the
+The module's versions follow the Packvium releases: 1.7.0 here answers every request the way
+Packvium 1.7.0 does in the other languages. Within 1.x, field names, status codes and the
 objective vector do not change. What each release added is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Testing

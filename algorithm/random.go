@@ -13,10 +13,11 @@ const (
 // bound are rejected, so the result carries no modulo bias.
 type DeterministicRandom struct{ state int64 }
 
-// NewDeterministicRandom seeds the generator. Go's % keeps the dividend's sign, as the
-// reference's does.
+// NewDeterministicRandom seeds the generator with the seed's residue modulo 2^31. Go's %
+// keeps the dividend's sign and the reference's does not, so a negative seed is lifted into
+// the range: the shuffle indexes by the draw.
 func NewDeterministicRandom(seed int64) *DeterministicRandom {
-	return &DeterministicRandom{state: seed % randomModulus}
+	return &DeterministicRandom{state: (seed%randomModulus + randomModulus) % randomModulus}
 }
 
 func (r *DeterministicRandom) bits() int64 {

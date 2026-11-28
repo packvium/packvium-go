@@ -1,13 +1,13 @@
 package domain
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/packvium/packvium-go/compression"
 	"github.com/packvium/packvium-go/hull"
+	"github.com/packvium/packvium-go/internal/pyrepr"
+	"github.com/packvium/packvium-go/internal/refusal"
 	"github.com/packvium/packvium-go/units"
 )
 
@@ -96,7 +96,7 @@ func NewItem(spec ItemSpec) (*Item, error) {
 		}
 	}
 	if len(frozen.AllowedRotations) == 0 {
-		return nil, errors.New("at least one rotation must be allowed")
+		return nil, refusal.New("invalid_value", "at least one rotation must be allowed")
 	}
 	frozen.HullVertices = append([]hull.Vertex(nil), spec.HullVertices...)
 	frozen.Tags, frozen.IncompatibleTags, frozen.EligibleContainerTags = nil, nil, nil
@@ -111,21 +111,23 @@ func NewItem(spec ItemSpec) (*Item, error) {
 func validateItem(spec ItemSpec) error {
 	switch {
 	case spec.ID == "":
-		return errors.New("item id is required")
+		return refusal.New("invalid_value", "item id is required")
 	case spec.Quantity <= 0:
-		return errors.New("item quantity must be positive")
+		return refusal.New("below_minimum", "item quantity must be positive")
 	case !(spec.MinimumSupportRatio >= 0 && spec.MinimumSupportRatio <= 1):
-		return errors.New("minimum_support_ratio must be between 0 and 1")
+		return refusal.Ratio(spec.MinimumSupportRatio, "minimum_support_ratio must be between 0 and 1")
 	case spec.MaxStackedItems != nil && *spec.MaxStackedItems < 1:
-		return errors.New("max_stacked_items must be at least 1")
-	case spec.StopIndex != nil && (*spec.StopIndex < 0 || *spec.StopIndex > MaxExactStopIndex):
-		return errors.New("stop_index must be a non-negative safe integer")
+		return refusal.New("below_minimum", "max_stacked_items must be at least 1")
+	case spec.StopIndex != nil && *spec.StopIndex < 0:
+		return refusal.New("below_minimum", "stop_index must be a non-negative safe integer")
+	case spec.StopIndex != nil && *spec.StopIndex > MaxExactStopIndex:
+		return refusal.New("above_maximum", "stop_index must be a non-negative safe integer")
 	case spec.Value != nil && *spec.Value < 0:
-		return errors.New("value must be non-negative")
+		return refusal.New("below_minimum", "value must be non-negative")
 	case spec.NestingHeight != nil && spec.NestingHeight.Ticks() >= spec.Dimensions.Height().Ticks():
-		return errors.New("nesting_height must be at least zero and strictly less than the item's own height")
+		return refusal.New("invalid_value", "nesting_height must be at least zero and strictly less than the item's own height")
 	case spec.GroundContactRule != nil && !containsString(groundContactRules, *spec.GroundContactRule):
-		return fmt.Errorf("ground_contact_rule must be one of ['%s']", strings.Join(groundContactRules, "', '"))
+		return refusal.New("not_allowed", "ground_contact_rule must be one of "+pyrepr.StringList(groundContactRules))
 	}
 	return validateShape(spec)
 }
@@ -134,13 +136,17 @@ func validateShape(spec ItemSpec) error {
 	if _, err := ParseShapeType(string(spec.ShapeType)); err != nil {
 		return err
 	}
+	// The value's own floor first, as the JSON rules check it before the shape.
+	if spec.MaxCompressionPressureKPA != nil && *spec.MaxCompressionPressureKPA < 0 {
+		return refusal.New("below_minimum", "max_compression_pressure_kpa cannot be negative")
+	}
 	for _, field := range foreignToShape(spec) {
 		if field.present {
-			return fmt.Errorf("%s is not part of a %s item", field.name, spec.ShapeType)
+			return refusal.New("invalid_value", fmt.Sprintf("%s is not part of a %s item", field.name, spec.ShapeType))
 		}
 	}
 	if spec.NestingHeight != nil && spec.ShapeType != RigidCuboid {
-		return fmt.Errorf("nesting_height with shape_type %s is not supported yet", spec.ShapeType)
+		return refusal.New("invalid_value", fmt.Sprintf("nesting_height with shape_type %s is not supported yet", spec.ShapeType))
 	}
 	switch spec.ShapeType {
 	case ConvexHull:
@@ -171,7 +177,7 @@ func foreignToShape(spec ItemSpec) []shapeField {
 
 func validateHull(spec ItemSpec) error {
 	if spec.HullVertices == nil {
-		return errors.New("a convex_hull item requires hull_vertices")
+		return refusal.New("invalid_value", "a convex_hull item requires hull_vertices")
 	}
 	vertices, err := hull.Validate(spec.HullVertices)
 	if err != nil {
@@ -182,8 +188,8 @@ func validateHull(spec ItemSpec) error {
 	declared := [3]int64{spec.Dimensions.Length().Ticks(), spec.Dimensions.Width().Ticks(), spec.Dimensions.Height().Ticks()}
 	for axis := range extent {
 		if extent[axis] > declared[axis] {
-			return fmt.Errorf("hull_vertices span (%d, %d, %d) does not fit inside dimensions (%d, %d, %d)",
-				extent[0], extent[1], extent[2], declared[0], declared[1], declared[2])
+			return refusal.New("invalid_value", fmt.Sprintf("hull_vertices span (%d, %d, %d) does not fit inside dimensions (%d, %d, %d)",
+				extent[0], extent[1], extent[2], declared[0], declared[1], declared[2]))
 		}
 	}
 	return nil
@@ -192,11 +198,9 @@ func validateHull(spec ItemSpec) error {
 func validateCompression(spec ItemSpec) error {
 	switch {
 	case spec.CompressionRatioPPM == nil || spec.MaxCompressionPressureKPA == nil:
-		return errors.New("a compressible item requires both compression_ratio and max_compression_pressure_kpa")
+		return refusal.New("invalid_value", "a compressible item requires both compression_ratio and max_compression_pressure_kpa")
 	case *spec.CompressionRatioPPM < 0 || *spec.CompressionRatioPPM > compression.PPM:
-		return errors.New("compression_ratio must be between zero and one")
-	case *spec.MaxCompressionPressureKPA < 0:
-		return errors.New("max_compression_pressure_kpa cannot be negative")
+		return refusal.New("invalid_value", "compression_ratio must be between zero and one")
 	}
 	return nil
 }

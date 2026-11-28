@@ -3,6 +3,7 @@ package constraint
 import (
 	"math/big"
 	"math/bits"
+	"sort"
 
 	"github.com/packvium/packvium-go/compression"
 	"github.com/packvium/packvium-go/domain"
@@ -139,37 +140,40 @@ func (a *LoadAnalysis) Crushed() *Violation {
 // upward, each list in first-reached order: children first, each followed by its own
 // ancestors depth first. The lists are shared and must not be modified.
 func (a *LoadAnalysis) RestingAbove() [][]int {
-	if a.restingAbove == nil {
-		memo := make([][]int, len(a.units))
-		done := make([]bool, len(a.units))
-		for index := range a.units {
-			a.aboveSet(index, memo, done)
+	if a.restingAbove != nil {
+		return a.restingAbove
+	}
+	above := make([][]int, len(a.units))
+	// stamp marks the members already gathered for the unit being walked, so no map is built
+	// per unit.
+	stamp := make([]int, len(a.units))
+	for index := range stamp {
+		stamp[index] = -1
+	}
+	// The load order puts a child, whose top is above its supporter's, before the supporter, so
+	// every child's set is complete when its supporter reads it: no recursion, whose depth would
+	// grow with the stack's height. O(sum of set sizes * log) after the load order.
+	for _, index := range a.graph.descendingOrder() {
+		var members []int
+		add := func(member int) {
+			if stamp[member] != index {
+				stamp[member] = index
+				members = append(members, member)
+			}
 		}
-		a.restingAbove = memo
-	}
-	return a.restingAbove
-}
-
-func (a *LoadAnalysis) aboveSet(index int, memo [][]int, done []bool) []int {
-	if done[index] {
-		return memo[index]
-	}
-	var result []int
-	seen := make(map[int]struct{})
-	add := func(member int) {
-		if _, found := seen[member]; !found {
-			seen[member] = struct{}{}
-			result = append(result, member)
+		for _, child := range a.graph.Children(index) {
+			add(child)
+			for _, member := range above[child] {
+				add(member)
+			}
 		}
+		// Ascending: the route rule names the first violator, and every engine must name the
+		// same one.
+		sort.Ints(members)
+		above[index] = members
 	}
-	for _, child := range a.graph.Children(index) {
-		add(child)
-		for _, member := range a.aboveSet(child, memo, done) {
-			add(member)
-		}
-	}
-	memo[index], done[index] = result, true
-	return result
+	a.restingAbove = above
+	return above
 }
 
 // StackedCounts is how many items rest anywhere above each unit. A count, not a weight.
